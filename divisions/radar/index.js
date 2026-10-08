@@ -1,7 +1,81 @@
-// ALBERT – DIVISION RADAR
-// Beschaffungsrecherche und neue Bezugsquellen
+// ============================================================
+// ALBERT – RADAR V2.0
+// Live-Anbindung an Supabase Research
+// ============================================================
 
-module.exports = {
+const RADAR = {
   name: "RADAR",
-  description: "Entdeckt Warenposten, Restposten, Überbestände, Liquidationen und neue B2B-Bezugsquellen."
+
+  description:
+    "Entdeckt reale B2B-Warenposten über die Albert Research Engine.",
+
+  async execute(input = {}) {
+    console.log("[RADAR] Starte Live-Recherche");
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error(
+        "RADAR: Supabase-Zugangsdaten fehlen."
+      );
+    }
+
+    const query =
+      typeof input.query === "string"
+        ? input.query.trim()
+        : "";
+
+    const response = await fetch(
+      `${supabaseUrl.replace(/\/$/, "")}/functions/v1/albert-research`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+          apikey: supabaseKey
+        },
+
+        body: JSON.stringify({
+          query
+        }),
+
+        signal: AbortSignal.timeout(120000)
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        `RADAR: Recherche fehlgeschlagen (${response.status}): ${
+          data.error || "Unbekannter Fehler"
+        }`
+      );
+    }
+
+    if (!data.success) {
+      return {
+        radar_status: data.status || "NO_RESULT",
+        radar_verified: false,
+        product: null,
+        research_response: data
+      };
+    }
+
+    const product =
+      data.saved_deal ||
+      data.deal ||
+      null;
+
+    return {
+      radar_status: data.status || "COMPLETED",
+      radar_verified: false,
+      product,
+      research_response: data
+    };
+  }
 };
+
+module.exports = RADAR;
