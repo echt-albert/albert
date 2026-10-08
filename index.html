@@ -125,15 +125,18 @@
 
     <main class="max-w-5xl w-full mx-auto px-8 py-10">
       
-      <!-- Albert KI Chat Interface -->
-      <section class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm mb-6">
-        <h2 class="text-sm font-semibold tracking-tight text-[#1d1d1f] mb-4 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
-          Albert Command Interface (KI)
-        </h2>
+      <!-- Albert Communicator (Kompakt & Sticky) -->
+      <section class="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 shadow-sm mb-6 sticky top-20 z-20">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-semibold tracking-tight text-[#1d1d1f] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+            Albert Communicator
+          </h2>
+          <span class="text-[10px] text-slate-400 mono">Live AI Link</span>
+        </div>
         
-        <div id="chat-log" class="bg-[#fafafc] border border-slate-200/60 rounded-xl p-4 h-64 overflow-y-auto mb-4 text-xs space-y-3 font-mono">
-          <div class="text-slate-400">System bereit. Stelle eine Frage an Albert...</div>
+        <div id="chat-log" class="bg-[#fafafc] border border-slate-200/60 rounded-xl p-3 h-32 overflow-y-auto mb-3 text-xs space-y-2 font-mono">
+          <div class="text-slate-400">System bereit. Frage an Albert...</div>
         </div>
 
         <div class="flex gap-2">
@@ -141,12 +144,12 @@
             type="text" 
             id="user-input" 
             placeholder="Befehl oder Frage eingeben..." 
-            class="flex-1 bg-[#fafafc] border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs text-[#1d1d1f] focus:outline-none focus:border-slate-400 font-mono"
+            class="flex-1 bg-[#fafafc] border border-slate-200/80 rounded-xl px-3 py-2 text-xs text-[#1d1d1f] focus:outline-none focus:border-slate-400 font-mono"
             onkeydown="if(event.key === 'Enter') sendToAlbert()"
           />
           <button 
             onclick="sendToAlbert()"
-            class="bg-slate-900 hover:bg-black text-white px-5 py-2.5 rounded-xl text-xs font-medium tracking-wide transition-all cursor-pointer font-mono"
+            class="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-medium tracking-wide transition-all cursor-pointer font-mono"
           >
             Senden
           </button>
@@ -205,10 +208,10 @@
           ? data.choices[0].message.content 
           : 'Keine Antwort erhalten.';
 
-        chatLog.innerHTML += `<div class="text-cyan-900 bg-cyan-50/50 p-2.5 rounded-lg border border-cyan-100"><b>Albert:</b> ${reply}</div>`;
+        chatLog.innerHTML += `<div class="text-cyan-900 bg-cyan-50/50 p-2 rounded-lg border border-cyan-100"><b>Albert:</b> ${reply}</div>`;
         chatLog.scrollTop = chatLog.scrollHeight;
       } catch (error) {
-        chatLog.innerHTML += `<div class="text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-100"><b>Fehler:</b> ${error.message}</div>`;
+        chatLog.innerHTML += `<div class="text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-100"><b>Fehler:</b> ${error.message}</div>`;
         chatLog.scrollTop = chatLog.scrollHeight;
       }
     }
