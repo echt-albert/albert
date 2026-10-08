@@ -1,8 +1,7 @@
 // ============================================================
-// ALBERT CORE – Zentrale Steuerungsintelligenz
+// ALBERT CORE V1.1
+// Zentrale Steuerung des Albert Intelligence Network
 // ============================================================
-
-// Die fünf Divisionen einbinden
 
 const radar = require("../divisions/radar");
 const cipher = require("../divisions/cipher");
@@ -10,11 +9,10 @@ const oracle = require("../divisions/oracle");
 const quantum = require("../divisions/quantum");
 const verdict = require("../divisions/verdict");
 
-// Albert Core
-
 const Albert = {
+
   name: "ALBERT",
-  version: "1.0",
+  version: "1.1",
 
   description:
     "Zentrale Steuerungsintelligenz des Albert Intelligence Network",
@@ -27,26 +25,145 @@ const Albert = {
     VERDICT: verdict
   },
 
-  // Übersicht der verfügbaren Divisionen
+  // ----------------------------------------------------------
+  // DIVISIONEN
+  // ----------------------------------------------------------
 
   getDivisions() {
     return Object.keys(this.divisions);
   },
 
-  // Informationen zu einer Division abrufen
-
   getDivision(name) {
     return this.divisions[name?.toUpperCase()] || null;
   },
 
-  // Systemstatus abrufen
+  // ----------------------------------------------------------
+  // SYSTEMSTATUS
+  // ----------------------------------------------------------
 
   getStatus() {
+
+    const divisionStatus = {};
+
+    for (const [name, division] of Object.entries(this.divisions)) {
+      divisionStatus[name] = {
+        available: Boolean(division),
+        executable: typeof division?.execute === "function"
+      };
+    }
+
+    const allExecutable = Object.values(divisionStatus)
+      .every(division => division.executable);
+
     return {
       system: this.name,
       version: this.version,
-      divisions: this.getDivisions(),
-      status: "STRUCTURE_READY"
+      divisions: divisionStatus,
+      status: allExecutable
+        ? "READY"
+        : "MODULES_INCOMPLETE"
+    };
+  },
+
+  // ----------------------------------------------------------
+  // EINE DIVISION AUSFÜHREN
+  // ----------------------------------------------------------
+
+  async executeDivision(name, input) {
+
+    const division = this.getDivision(name);
+
+    if (!division) {
+      throw new Error(`Division ${name} existiert nicht.`);
+    }
+
+    if (typeof division.execute !== "function") {
+      throw new Error(
+        `Division ${name} besitzt noch keine execute()-Funktion.`
+      );
+    }
+
+    console.log(`[ALBERT] Starte ${name}`);
+
+    const startedAt = Date.now();
+
+    const result = await division.execute(input);
+
+    console.log(
+      `[ALBERT] ${name} abgeschlossen in ${Date.now() - startedAt} ms`
+    );
+
+    return result;
+  },
+
+  // ----------------------------------------------------------
+  // ALLE FÜNF DIVISIONEN AUSFÜHREN
+  // ----------------------------------------------------------
+
+  async run(input = {}) {
+
+    console.log("[ALBERT] Starte Intelligence Pipeline");
+
+    const results = {};
+    const executionLog = [];
+
+    let currentInput = input;
+
+    for (const name of this.getDivisions()) {
+
+      const startedAt = Date.now();
+
+      try {
+
+        const result = await this.executeDivision(
+          name,
+          currentInput
+        );
+
+        results[name] = result;
+
+        executionLog.push({
+          division: name,
+          status: "completed",
+          duration_ms: Date.now() - startedAt
+        });
+
+        currentInput = {
+          ...currentInput,
+          ...result,
+          previousDivision: name,
+          pipelineResults: { ...results }
+        };
+
+      } catch (error) {
+
+        executionLog.push({
+          division: name,
+          status: "failed",
+          error: error.message,
+          duration_ms: Date.now() - startedAt
+        });
+
+        console.error(
+          `[ALBERT] Fehler in ${name}:`,
+          error.message
+        );
+
+        return {
+          success: false,
+          failedDivision: name,
+          results,
+          executionLog
+        };
+      }
+    }
+
+    console.log("[ALBERT] Pipeline abgeschlossen");
+
+    return {
+      success: true,
+      results,
+      executionLog
     };
   }
 };
