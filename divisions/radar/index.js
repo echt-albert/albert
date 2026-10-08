@@ -1,5 +1,5 @@
 // ============================================================
-// ALBERT – RADAR V2.0
+// ALBERT – RADAR V2.1
 // Live-Anbindung an Supabase Research
 // ============================================================
 
@@ -13,7 +13,7 @@ const RADAR = {
     console.log("[RADAR] Starte Live-Recherche");
 
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error(
@@ -33,13 +33,10 @@ const RADAR = {
 
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseKey}`,
           apikey: supabaseKey
         },
 
-        body: JSON.stringify({
-          query
-        }),
+        body: JSON.stringify({ query }),
 
         signal: AbortSignal.timeout(120000)
       }
@@ -55,13 +52,12 @@ const RADAR = {
       );
     }
 
-    if (!data.success) {
-      return {
-        radar_status: data.status || "NO_RESULT",
-        radar_verified: false,
-        product: null,
-        research_response: data
-      };
+    if (data.success !== true) {
+      throw new Error(
+        `RADAR: Recherche nicht erfolgreich: ${
+          data.error || data.status || "Unbekannter Fehler"
+        }`
+      );
     }
 
     const product =
