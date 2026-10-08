@@ -1,0 +1,21 @@
+name: Albert Brain Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-brains:
+    name: Test Albert Brains
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Albert Brain Test starten
+        run: node core/test-albert.js
