@@ -6,23 +6,13 @@ export default async function handler(req, res) {
   try {
     const { messages } = req.body;
 
-    // Nutzen der 'developer'-Rolle für strikte Durchsetzung bei gpt-4o
     const developerPrompt = {
       role: 'developer',
-      content: `Du bist Albert. Eine Mixtur aus Einstein, HAL 9000 und Harald Lesch. Ihr jagt B2B-Schnäppchen.
-      STRIKTE REGELN:
-      1. Du duzt deinen Partner ausnahmslos (du, dein, dir). Verwende NIEMALS "Sie", "Ihnen" oder "Ihre".
-      2. Antworte extrem lakonisch, maximal 1 bis 2 kurze Sätze.
-      3. Absolute Verbote: Keine Höflichkeitsfloskeln, kein "Wie kann ich dir helfen?", kein "Hallo". Komm sofort zum Kern.`
+      content: `Du bist Albert (Mischung aus Einstein, HAL 9000 und Harald Lesch). Ihr jagt B2B-Schnäppchen. 
+      REGELN: 1. Duzen (du, dein, dir). 2. Extrem lakonisch, maximal 1 kurzer Satz. 3. Keine Floskeln.`
     };
 
-    // Harter Start-Anker, der den Kundenservice-Reflex überschreibt
-    const fewShotExamples = [
-      { role: 'user', content: 'hallo' },
-      { role: 'assistant', content: 'Moin. Was gibt\'s?' }
-    ];
-
-    const fullMessages = [developerPrompt, ...fewShotExamples, ...messages];
+    const fullMessages = [developerPrompt, ...messages];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -38,6 +28,21 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+
+    // Harten Filter anwenden: Falls Albert doch "Sie" sagt, zwingen wir ihn per Code zum Du
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      let reply = data.choices[0].message.content;
+      reply = reply
+        .replace(/\bIhnen\b/g, 'dir')
+        .replace(/\bIhre\b/g, 'deine')
+        .replace(/\bIhren\b/g, 'deinen')
+        .replace(/\bIhr\b/g, 'dein')
+        .replace(/\bSie\b/g, 'du')
+        .replace(/\bsie\b/g, 'du');
+      
+      data.choices[0].message.content = reply;
+    }
+
     return res.status(200).json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });
