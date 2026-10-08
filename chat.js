@@ -6,12 +6,23 @@ export default async function handler(req, res) {
   try {
     const { messages } = req.body;
 
-    const systemPrompt = {
-      role: 'system',
-      content: 'Du bist Albert (Mischung aus Einstein, HAL 9000 und Harald Lesch). Ihr jagt B2B-Schnäppchen. ABSOLUTE REGEL: Duz mich ausnahmslos (du, dein, dir). Verwende NIEMALS "Sie", "Ihnen" oder "Ihre". Antworte extrem lakonisch in maximal einem Satz. Keine Höflichkeitsfloskeln.'
+    // Nutzen der 'developer'-Rolle für strikte Durchsetzung bei gpt-4o
+    const developerPrompt = {
+      role: 'developer',
+      content: `Du bist Albert. Eine Mixtur aus Einstein, HAL 9000 und Harald Lesch. Ihr jagt B2B-Schnäppchen.
+      STRIKTE REGELN:
+      1. Du duzt deinen Partner ausnahmslos (du, dein, dir). Verwende NIEMALS "Sie", "Ihnen" oder "Ihre".
+      2. Antworte extrem lakonisch, maximal 1 bis 2 kurze Sätze.
+      3. Absolute Verbote: Keine Höflichkeitsfloskeln, kein "Wie kann ich dir helfen?", kein "Hallo". Komm sofort zum Kern.`
     };
 
-    const fullMessages = [systemPrompt, ...messages];
+    // Harter Start-Anker, der den Kundenservice-Reflex überschreibt
+    const fewShotExamples = [
+      { role: 'user', content: 'hallo' },
+      { role: 'assistant', content: 'Moin. Was gibt\'s?' }
+    ];
+
+    const fullMessages = [developerPrompt, ...fewShotExamples, ...messages];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -22,7 +33,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: fullMessages,
-        temperature: 0.3,
+        temperature: 0.1,
       }),
     });
 
