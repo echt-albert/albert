@@ -572,8 +572,10 @@
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
-      const panel = document.getElementById('decision-panel-' + dealId);
-      if (!panel) return;
+      const card = document.getElementById('deal-card-' + dealId);
+      if (!card) return;
+      const panel = document.getElementById('albert-decision-modal');
+      if (!panel || !panel.classList.contains('hidden')) return;
       const labels = {WATCH:'Beobachten',DEEP_DIVE:'Markt genauer prüfen',LEARN:'Erfahrung festhalten',REJECT:'Posten ablehnen'};
       const reasonSets = {
         WATCH: {question:'Warum beobachten?', reasons:['Preis könnte noch fallen','Nachfrage noch nicht belegt','Weitere Marktprüfung nötig','Lieferantenangebot abwarten','Aktuell keine Priorität','Anderer Grund'], placeholder:'Was müsste sich ändern, damit du kaufen würdest?'},
@@ -583,18 +585,19 @@
       };
       const config = reasonSets[action];
       const reasons = config.reasons;
-      const card = document.getElementById('deal-card-' + dealId);
       const hint = action === 'DEEP_DIVE' && card?.dataset.marketVerified !== 'true'
         ? 'Hinweis: Ein verifizierter deutscher Gesamtmarktpreis ist für diesen Deal noch nicht hinterlegt.'
         : action === 'DEEP_DIVE' && card?.dataset.hasEan !== 'true'
           ? 'Hinweis: Für diesen Deal fehlt noch die EAN.' : '';
       panel.classList.remove('hidden');
-      panel.innerHTML = '<div class="text-xs font-semibold text-slate-800 mb-2">Dein nächster Schritt: ' + escapeHtml(labels[action]) + '</div>' +
+      panel.classList.add('flex');
+      panel.innerHTML = '<div class="absolute inset-0 bg-slate-900/40" data-modal-backdrop="true"></div><section role="dialog" aria-modal="true" aria-labelledby="decision-modal-title" class="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">' +
+        '<div class="flex items-start justify-between gap-3 mb-3"><div><div class="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Dein Urteil</div><h2 id="decision-modal-title" class="text-base font-semibold text-slate-900">' + escapeHtml(labels[action]) + '</h2><p class="mt-1 text-xs text-slate-500">' + escapeHtml(window.albertDealsById?.get(String(dealId))?.product_name || 'Deal') + '</p></div><button type="button" data-modal-close="true" aria-label="Schließen" class="rounded-lg px-2 text-xl text-slate-400 hover:text-slate-800">×</button></div>' +
         '<p class="text-xs text-slate-600 mb-3">' + escapeHtml(config.question) + ' <span class="text-slate-400">(optional)</span></p>' + (hint ? '<p class="text-xs text-amber-800 mb-3">' + escapeHtml(hint) + '</p>' : '') +
         '<div class="flex flex-wrap gap-2 mb-3">' + reasons.map((reason,i)=>'<button type="button" class="decision-reason px-2 py-1 rounded-md border border-slate-300 bg-white text-[11px]" data-reason="' + escapeHtml(reason) + '">' + escapeHtml(reason) + '</button>').join('') + '</div>' +
         '<textarea id="decision-note-' + dealId + '" maxlength="1400" rows="2" placeholder="' + escapeHtml(config.placeholder) + '" class="w-full text-xs rounded-lg border border-slate-300 p-2 mb-3"></textarea>' +
         '<div class="flex gap-2 items-center"><button type="button" id="decision-save-' + dealId + '" class="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold">Entscheidung bestätigen</button><button type="button" id="decision-cancel-' + dealId + '" class="px-3 py-2 text-xs text-slate-600">Abbrechen</button></div>' +
-        '<p class="text-[11px] text-slate-500 mt-2">Dein Urteil wird zum Deal gespeichert. Es ist kein automatisch bestätigter Marktbeleg.</p>';
+        '<p class="text-[11px] text-slate-500 mt-2">Dein Urteil wird zum Deal gespeichert. Es ist kein automatisch bestätigter Marktbeleg.</p></section>';
       let selectedReason = '';
       panel.querySelectorAll('.decision-reason').forEach(button=>button.addEventListener('click',()=>{
         selectedReason = selectedReason === button.dataset.reason ? '' : button.dataset.reason;
@@ -604,14 +607,29 @@
           item.classList.toggle('border-amber-500',active);
         });
       }));
-      const confirmed = await new Promise(resolve=>{
-        document.getElementById('decision-save-' + dealId).addEventListener('click',()=>resolve(true),{once:true});
-        document.getElementById('decision-cancel-' + dealId).addEventListener('click',()=>resolve(false),{once:true});
+      const confirmed = await new Promise(resolve => {
+        let settled = false;
+        const finish = value => {
+          if (settled) return;
+          settled = true;
+          document.removeEventListener('keydown', onKey);
+          panel.removeEventListener('click', onOverlay);
+          resolve(value);
+        };
+        const onKey = event => { if (event.key === 'Escape') finish(false); };
+        const onOverlay = event => {
+          if (event.target.closest('[data-modal-close]') || event.target.dataset.modalBackdrop) finish(false);
+        };
+        document.addEventListener('keydown', onKey);
+        panel.addEventListener('click', onOverlay);
+        document.getElementById('decision-save-' + dealId).addEventListener('click', () => finish(true), {once:true});
+        document.getElementById('decision-cancel-' + dealId).addEventListener('click', () => finish(false), {once:true});
+        document.getElementById('decision-note-' + dealId).focus();
       });
-      if (!confirmed) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+      if (!confirmed) { panel.classList.add('hidden'); panel.classList.remove('flex'); panel.innerHTML = ''; return; }
       const note = document.getElementById('decision-note-' + dealId).value.trim();
       const comment = (selectedReason ? '[Grund: ' + selectedReason + '] ' : '') + note;
-      panel.innerHTML = '<div class="text-xs text-amber-800 flex items-center gap-2"><span class="albert-spinner"></span> Entscheidung wird gespeichert …</div>';
+      panel.classList.add('hidden'); panel.classList.remove('flex'); panel.innerHTML = '';
       showStatus('Speichere Entscheidung zum Deal …', false);
       try {
         const { data: deal, error: readError } = await supabaseClient
@@ -1628,7 +1646,7 @@
                   </button>
 
                 </div>
-                <div id="decision-panel-${dealId}" class="hidden mt-3 bg-white rounded-lg border border-amber-200 p-3" aria-live="polite"></div>
+
                 <p class="text-[11px] text-slate-600 mt-2">Wähle eine Aktion. Albert fragt nur nach einer optionalen Begründung.</p>
               </div>
 
@@ -1840,5 +1858,6 @@
 
   </script>
 
+    <div id="albert-decision-modal" class="fixed inset-0 z-[110] hidden items-center justify-center p-4" aria-live="polite"></div>
 </body>
 </html>
