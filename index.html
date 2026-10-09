@@ -540,6 +540,26 @@
         const { error: feedbackError } = await supabaseClient.from('deal_feedback')
           .insert({ discovery_id: dealId, ...feedback });
         if (feedbackError) throw feedbackError;
+        if (action === 'DEEP_DIVE') {
+          await fetchDeals();
+          showStatus('Deep Dive Market: unabhängige Suchquellen werden abgefragt …', false);
+          try {
+            const researchResponse = await fetch('/api/deep-dive', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({product:deal})
+            });
+            const researchData = await researchResponse.json();
+            if (!researchResponse.ok || !researchData.success) throw Error(researchData.error || 'Recherche fehlgeschlagen.');
+            const {error:saveError}=await supabaseClient.from('discoveries')
+              .update({market_deep_dive:researchData.report}).eq('id',dealId);
+            if(saveError) throw saveError;
+            showStatus('Deep Dive: Quellen gesammelt. Preise und Nachfrage sind noch nicht verifiziert.',false);
+          } catch(researchError) {
+            showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
+          }
+          await fetchDeals();
+          return;
+        }
         if (!deal.brain_analysis) {
           showStatus('Feedback gespeichert. Für diesen älteren Posten fehlt die Analyse vor VERDICT.', false);
           await fetchDeals();
@@ -1112,6 +1132,21 @@
               id="deep-dive-${cardId}"
               class="hidden mt-6 pt-6 border-t border-slate-100 space-y-4 text-xs"
             >
+
+              ${deal.market_deep_dive ? `
+                <div class="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-2">
+                  <div class="font-mono font-bold text-blue-900">📊 Deep Dive Market · Recherchebelege</div>
+                  <p class="text-slate-600">Stand: ${escapeHtml(deal.market_deep_dive.checked_at || '—')} · Produktabgleich: ${escapeHtml(deal.market_deep_dive.identity_status || 'UNVERIFIED')}</p>
+                  <p class="text-amber-800 font-semibold">Noch kein verifizierter B2C-Gesamtpreis und kein belegter Absatz. Keine belastbare Kaufentscheidung.</p>
+                  <div class="space-y-1">
+                    ${(deal.market_deep_dive.shopping_results || []).slice(0,12).map(item => `
+                      <div class="flex justify-between gap-3 border-t border-blue-100 pt-2">
+                        <a class="text-blue-700 hover:underline break-words" href="${safeUrl(item.url) || '#'}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title)} ↗</a>
+                        <span class="shrink-0 text-slate-600">${escapeHtml(item.display_price || 'Preis unbekannt')} · ${escapeHtml(item.identity_match)}</span>
+                      </div>`).join('')}
+                  </div>
+                  <p class="text-slate-500">Quelle: ${escapeHtml(deal.market_deep_dive.source)} · Preis-/Versandangaben sind Suchtreffer, keine geprüften Händlerangebote.</p>
+                </div>` : ''}
 
               <!-- AKTIONEN -->
 
