@@ -549,26 +549,19 @@
 
       try {
 
-        const response = await fetch('/api/chat', {
-
-          method: 'POST',
-
-          headers: {
-            'Content-Type': 'application/json'
-          },
-
-          body: JSON.stringify({
-            messages: chatMessages.slice(-20)
-          })
-
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          throw new Error(
-            data.error || `HTTP ${response.status}`
-          );
+        const isResearch = /\b(recherchier\w*|such\w*|find\w*|jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\w*|sourcing)\b/i.test(text);
+        let data;
+        if (isResearch) {
+          appendChatMessage('Albert', 'RADAR recherchiert im Hintergrund. Das kann etwa eine Minute dauern.', 'albert');
+          data = await runBrainResearch(text);
+        } else {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: chatMessages.slice(-20), mode: 'chat_only' })
+          });
+          data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
         }
 
         const reply =
@@ -1390,30 +1383,54 @@
     // SOFORT-JAGD
     // =======================================================
 
-    window.triggerManualHunt = async function() {
-      showStatus('Albert startet RADAR → CIPHER → ORACLE → QUANTUM → VERDICT …', false);
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: 'pipeline',
-            messages: [{ role: 'user', content: 'Finde einen neuen aktuellen B2B-Warenposten.' }]
-          })
+    async function runBrainResearch(query, onProgress = () => {}) {
+      const started = await supabaseClient.functions.invoke('albert-jobs', {
+        body: { action: 'start', query }
+      });
+      if (started.error || !started.data?.job_id) {
+        throw new Error(started.error?.message || started.data?.error || 'Recherche konnte nicht gestartet werden.');
+      }
+      const jobId = started.data.job_id;
+      let research = null;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const check = await supabaseClient.functions.invoke('albert-jobs', {
+          body: { action: 'status', id: jobId }
         });
-        const data = await response.json();
-        if (!response.ok || !data.success) throw new Error(data.error || 'Pipeline fehlgeschlagen.');
-        const log = data.pipeline?.executionLog || [];
-        const failed = log.find(step => step.status !== 'completed');
-        if (failed) throw new Error('Brain ' + failed.division + ': ' + (failed.error || 'Fehler'));
-        const verdict = data.pipeline?.results?.VERDICT;
-        const radar = data.pipeline?.results?.RADAR;
-        showStatus(
-          'Fünf Brains abgeschlossen · RADAR: ' + (radar?.radar_status || 'OK') +
-          ' · VERDICT: ' + (verdict?.verdict_grade || 'B') +
-          ' (vorläufig; Markt und Nachfrage nicht unabhängig verifiziert).',
-          false
+        if (check.error) throw new Error(check.error.message);
+        if (check.data?.status === 'failed') throw new Error(check.data.error || 'RADAR-Recherche fehlgeschlagen.');
+        if (check.data?.status === 'completed') {
+          research = check.data.result;
+          break;
+        }
+        onProgress('RADAR recherchiert … ' + ((attempt + 1) * 3) + ' s');
+      }
+      if (!research) throw new Error('Recherche dauert zu lange; Job-ID: ' + jobId);
+      const product = research.saved_deal || research.deal;
+      if (!product) throw new Error('RADAR hat keinen neuen prüfbaren Posten geliefert (' + (research.status || 'kein Ergebnis') + ').');
+      onProgress('RADAR abgeschlossen · CIPHER → ORACLE → QUANTUM → VERDICT …');
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'pipeline', researchProduct: product,
+          messages: [{ role: 'user', content: query }] })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Brain-Auswertung fehlgeschlagen.');
+      return data;
+    }
+
+    window.triggerManualHunt = async function() {
+      showStatus('RADAR startet Hintergrundrecherche …', false);
+      try {
+        const data = await runBrainResearch(
+          'Finde einen neuen aktuellen B2B-Warenposten.',
+          message => showStatus(message, false)
         );
+        const verdict = data.pipeline?.results?.VERDICT;
+        showStatus('Fünf Brains abgeschlossen · VERDICT: ' +
+          (verdict?.verdict_grade || 'B') +
+          ' · Vorläufig: Markt und Nachfrage noch nicht unabhängig verifiziert.', false);
         setTimeout(fetchDeals, 1500);
       } catch (err) {
         showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
