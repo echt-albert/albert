@@ -136,6 +136,10 @@
         <div class="flex items-center justify-between mb-3"><div class="text-[10px] uppercase tracking-[0.16em] font-mono text-slate-400">Kategorien</div><span class="text-[10px] text-slate-300 font-mono">FILTER</span></div>
         <div id="category-filters" class="flex flex-wrap content-start items-start gap-1.5 max-h-64 overflow-y-auto pr-1" aria-label="Deals nach Kategorie filtern"></div>
       </div>
+      <div class="mt-5 border-t border-slate-100 pt-4">
+        <div class="flex items-center justify-between mb-3"><div class="text-[10px] uppercase tracking-[0.16em] font-mono text-slate-400">Bewertung</div><span class="text-[10px] text-slate-300 font-mono">FILTER</span></div>
+        <div id="grade-filters" class="flex flex-wrap items-start gap-1.5" aria-label="Deals nach A-, B-, C- oder X-Bewertung filtern"></div>
+      </div>
 
     </div>
 
@@ -719,6 +723,7 @@
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
     let activeDealView = 'INBOX';
     let activeCategoryFilter = null;
+    let activeGradeFilter = null;
     const dealViewNames = { INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
@@ -728,6 +733,7 @@
       dealExpansion.clear();
       activeDealView = nextView;
       activeCategoryFilter = null;
+      activeGradeFilter = null;
       fetchDeals();
     });
 
@@ -839,6 +845,13 @@
       const button = event.target.closest('button[data-category]');
       if (!button) return;
       activeCategoryFilter = button.dataset.category === '__ALL__' ? null : button.dataset.category;
+      fetchDeals();
+    });
+
+    document.getElementById('grade-filters').addEventListener('click', event => {
+      const button = event.target.closest('button[data-grade]');
+      if (!button) return;
+      activeGradeFilter = button.dataset.grade === '__ALL__' ? null : button.dataset.grade;
       fetchDeals();
     });
 
@@ -1057,7 +1070,20 @@
         categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
         [...categoryCounts.entries()].sort((a,b) => a[0].localeCompare(b[0],'de'))
           .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
-      const visibleDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
+      // Die sichtbare Bewertung folgt derselben Priorität wie auf der Deal-Karte.
+      const dealGrade = deal => String(deal.human_verdict?.verdict_grade || deal.decision_grade || '').trim().toUpperCase();
+      const categoryDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
+      const grades = ['A', 'B', 'C', 'X'];
+      const gradeCounts = new Map(grades.map(grade => [grade, categoryDeals.filter(deal => dealGrade(deal) === grade).length]));
+      const gradeButton = (label, count, selected, value) => {
+        const tones = { A: 'border-emerald-200 bg-emerald-50 text-emerald-800', B: 'border-cyan-200 bg-cyan-50 text-cyan-800', C: 'border-amber-200 bg-amber-50 text-amber-800', X: 'border-rose-200 bg-rose-50 text-rose-800' };
+        const tone = selected ? (tones[value] || 'border-slate-300 bg-slate-100 text-slate-900') : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50';
+        return '<button type="button" data-grade="' + value + '" aria-pressed="' + selected + '" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] leading-tight transition-colors ' + tone + (selected ? ' font-semibold ring-1 ring-current/20' : '') + '"><span>' + label + '</span><span class="font-mono text-[10px] opacity-70">' + count + '</span></button>';
+      };
+      document.getElementById('grade-filters').innerHTML =
+        gradeButton('Alle', categoryDeals.length, !activeGradeFilter, '__ALL__') +
+        grades.map(grade => gradeButton(grade, gradeCounts.get(grade), activeGradeFilter === grade, grade)).join('');
+      const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
 
