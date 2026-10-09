@@ -719,6 +719,27 @@
       fetchDeals();
     });
 
+    function plainProductDescription(deal) {
+      const name = String(deal.product_name || '').trim();
+      const source = String(deal.product_description || deal.description || deal.short_description || '').trim();
+      if (source && source.toLocaleLowerCase('de-DE') !== name.toLocaleLowerCase('de-DE')) return source;
+      const t = name.toLocaleLowerCase('de-DE');
+      const explanations = [
+        [/kaffeevollautomat/, 'Ein Kaffeevollautomat mahlt Kaffeebohnen und bereitet Kaffee auf Knopfdruck zu. Je nach Modell sind auch Milchgetränke möglich.'],
+        [/airfryer|heissluftfritteuse|heißluftfritteuse/, 'Eine Heißluftfritteuse gart Lebensmittel mit zirkulierender heißer Luft. Sie eignet sich zum Beispiel für Pommes, Gemüse und andere kleine Gerichte.'],
+        [/multikocher|instant pot|schnellkochtopf/, 'Ein elektrischer Multikocher übernimmt mehrere Kochaufgaben in einem Gerät. Welche Programme vorhanden sind, hängt vom Modell ab.'],
+        [/haargl[aä]tter|gl[aä]tteisen/, 'Ein Haarglätter ist ein elektrisch beheiztes Stylinggerät, mit dem sich Haare glätten und je nach Anwendung auch formen lassen.'],
+        [/staubsauger/, 'Ein Staubsauger entfernt Staub und Schmutz von Böden und anderen geeigneten Oberflächen.'],
+        [/wasserkocher/, 'Ein Wasserkocher erhitzt Wasser elektrisch, etwa für Tee oder andere Heißgetränke.'],
+        [/toaster/, 'Ein Toaster röstet Brotscheiben mit elektrischer Wärme.'],
+        [/matratze/, 'Eine Matratze bildet die Liegefläche eines Bettes und soll den Körper beim Schlafen stützen.'],
+        [/kopfh[oö]rer|headphone/, 'Kopfhörer geben Ton direkt am Ohr wieder, zum Beispiel für Musik, Videos oder Gespräche.'],
+        [/drucker/, 'Ein Drucker bringt digitale Dokumente oder Bilder auf Papier. Die unterstützten Funktionen hängen vom Modell ab.']
+      ];
+      const match = explanations.find(([pattern]) => pattern.test(t));
+      if (match) return match[1];
+      return 'Das angebotene Produkt heißt „' + (name || 'Unbekanntes Produkt') + '“. Eine verlässliche Beschreibung der Funktion und Ausstattung liegt derzeit nicht vor.';
+    }
     function categoryName(deal) {
       const confirmed = categoryLabels.get(String(deal.id));
       if (confirmed) return confirmed;
@@ -1358,6 +1379,16 @@
 
                 </div>
 
+              </div>
+
+              <!-- PRODUKT EINFACH ERKLÄRT -->
+              <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKT ERKLÄRT</span>
+                </div>
+                <p class="text-[12px] leading-relaxed text-slate-700">${escapeHtml(plainProductDescription(deal))}</p>
+                <p class="mt-3 text-[10px] text-slate-400">Allgemeine Einordnung; modellspezifische Eigenschaften nur bei vorhandener Beschreibung.</p>
               </div>
 
             </div>
