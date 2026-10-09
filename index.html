@@ -783,7 +783,8 @@
         if (!latestAction.has(key) && ['WATCH','DEEP_DIVE','LEARN','REJECT'].includes(row.action)) latestAction.set(key, row.action);
       }
       const counts = { INBOX: 0, SOFORT: 0, WATCH: 0, DEEP_DIVE: 0, LEARN: 0, REJECT: 0 };
-      for (const deal of deals || []) { counts[latestAction.get(String(deal.id)) || 'INBOX']++; if (deal.hunt_origin === 'SOFORT') counts.SOFORT++; }
+      const dealFolder = deal => latestAction.get(String(deal.id)) || (deal.hunt_origin === 'SOFORT' ? 'SOFORT' : 'INBOX');
+      for (const deal of deals || []) counts[dealFolder(deal)]++;
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
       document.querySelectorAll('.deal-view').forEach(button => {
         const selected = button.dataset.view === activeDealView;
@@ -793,7 +794,7 @@
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const visibleDeals = (deals || []).filter(deal => activeDealView === 'SOFORT' ? deal.hunt_origin === 'SOFORT' : (latestAction.get(String(deal.id)) || 'INBOX') === activeDealView);
+      const visibleDeals = (deals || []).filter(deal => dealFolder(deal) === activeDealView);
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
 
@@ -872,8 +873,8 @@
         const compact = !expanded;
         const grade = escapeHtml(deal.human_verdict?.verdict_grade || deal.decision_grade || '—');
         const latestFeedback = (feedbackRows || []).find(row => String(row.discovery_id) === String(deal.id));
-        const currentAction = latestAction.get(String(deal.id)) || 'INBOX';
-        const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',INBOX:'Neu'}[currentAction];
+        const currentAction = dealFolder(deal);
+        const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',SOFORT:'Neu',INBOX:'Neu'}[currentAction];
 
         const offerUrl = safeUrl(deal.offer_url);
 
