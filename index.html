@@ -1780,7 +1780,7 @@
       }
       if (!research) throw new Error('Recherche dauert zu lange; Job-ID: ' + jobId);
       const product = research.saved_deal || research.deal;
-      if (!product) throw new Error('RADAR hat keinen neuen prüfbaren Posten geliefert (' + (research.status || 'kein Ergebnis') + ').');
+      if (!product) return { outcome: 'empty', count: 0 };
       onProgress('RADAR abgeschlossen · CIPHER → ORACLE → QUANTUM …');
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -1796,7 +1796,13 @@
           .update({ brain_analysis: analysis, hunt_origin: 'SOFORT' }).eq('id', product.id);
         if (saveError) throw new Error('Analyse konnte nicht gespeichert werden: ' + saveError.message);
       }
-      return data;
+      // Erfolg nur melden, wenn der neue Posten tatsächlich in der Sofort-Jagd gespeichert ist.
+      if (!product.id) return { outcome: 'unverified', count: 0 };
+      const { data: storedDeal, error: verifyError } = await supabaseClient.from('discoveries')
+        .select('id, hunt_origin').eq('id', product.id).maybeSingle();
+      if (verifyError) throw new Error('Recherche beendet, Speicherung konnte nicht überprüft werden: ' + verifyError.message);
+      if (!storedDeal || storedDeal.hunt_origin !== 'SOFORT') return { outcome: 'unverified', count: 0 };
+      return { outcome: 'saved', count: 1 };
     }
 
     window.triggerManualHunt = async function() {
@@ -1807,10 +1813,15 @@
           'Finde einen neuen aktuellen B2B-Warenposten.',
           message => { showStatus(message, false); setAlbertActivity('hunt', 'Sofort-Jagd', message); }
         );
-        finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen.');
-        activeDealView = 'SOFORT';
-        showStatus('Sofort-Jagd abgeschlossen · Ergebnisse unter ⚡ Sofort-Jagd.', false);
-        setTimeout(fetchDeals, 1500);
+        if (data.outcome === 'saved') {
+          finishAlbertActivity('hunt', 'Sofort-Jagd', data.count + ' neuer Deal im Sofort-Jagd-Ordner.');
+          activeDealView = 'SOFORT';
+        } else if (data.outcome === 'empty') {
+          finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen. Diesmal keine passenden Deals gefunden.', false, true);
+        } else {
+          finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen, aber kein neuer Deal im Sofort-Jagd-Ordner bestätigt.', false, true);
+        }
+        await fetchDeals();
       } catch (err) {
         finishAlbertActivity('hunt', 'Sofort-Jagd', err.message, true);
         showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
