@@ -122,8 +122,8 @@
         </button>
       </nav>
       <div class="mt-8 border-t border-slate-100 pt-4">
-        <div class="text-[10px] uppercase tracking-widest font-mono text-slate-400 mb-2">Gefundene Kategorien</div>
-        <div id="category-filters" class="flex flex-wrap gap-1.5 text-[10px] font-mono" aria-label="Deals nach Kategorie filtern"></div>
+        <div class="flex items-center justify-between mb-3"><div class="text-[10px] uppercase tracking-[0.16em] font-mono text-slate-400">Kategorien</div><span class="text-[10px] text-slate-300 font-mono">FILTER</span></div>
+        <div id="category-filters" class="space-y-0.5 max-h-64 overflow-y-auto pr-1" aria-label="Deals nach Kategorie filtern"></div>
       </div>
 
     </div>
@@ -809,12 +809,15 @@
       }
       if (activeCategoryFilter && !categoryCounts.has(activeCategoryFilter)) activeCategoryFilter = null;
       const categoryButton = (name, count, selected, value) =>
-        '<button type="button" data-category="' + escapeHtml(value) + '" aria-pressed="' + selected +
-        '" class="rounded-md border px-2 py-1 transition-colors ' +
-        (selected ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100') +
-        '">' + escapeHtml(name) + ' <span class="opacity-70">' + count + '</span></button>';
+        '<button type="button" data-category="' + escapeHtml(value) + '" title="' + escapeHtml(name) + '" aria-pressed="' + selected +
+        '" class="group w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ' +
+        (selected ? 'bg-amber-50 text-amber-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900') +
+        '"><span class="h-1.5 w-1.5 shrink-0 rounded-full ' + (selected ? 'bg-amber-500' : 'bg-slate-200 group-hover:bg-slate-400') +
+        '"></span><span class="min-w-0 flex-1 truncate text-[11px] ' + (selected ? 'font-semibold' : 'font-medium') +
+        '">' + escapeHtml(name) + '</span><span class="shrink-0 min-w-[22px] text-right font-mono text-[10px] ' +
+        (selected ? 'text-amber-800' : 'text-slate-400') + '">' + count + '</span></button>';
       document.getElementById('category-filters').innerHTML =
-        categoryButton('Alle', folderDeals.length, !activeCategoryFilter, '__ALL__') +
+        categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
         [...categoryCounts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'de'))
           .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
       const visibleDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
