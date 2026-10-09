@@ -827,14 +827,16 @@
       try{
         const response=await fetch(SUPABASE_URL+'/functions/v1/albert-market',{
           method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
-          body:JSON.stringify({product:deal})
+          body:JSON.stringify({product:deal}),signal:AbortSignal.timeout(35000)
         });
         const data=await response.json();
         if(!response.ok||!data.success)throw Error(data.error||'ORACLE-Recherche fehlgeschlagen.');
         const {error}=await supabaseClient.from('discoveries').update({market_deep_dive:data.report}).eq('id',dealId);
         if(error)throw error;
         const count=(data.report?.shopping_results||[]).filter(row=>row.merchant&&safeUrl(row.url)&&row.display_price).slice(0,3).length;
-        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+' gespeichert.',false,count===0);
+        const traces=(data.report?.diagnostics||[]).map(x=>x.engine+': '+(x.hits??'?')+' Treffer, '+(x.accepted??0)+' übernommen'+(x.error?' ('+x.error+')':'')).join(' | ');
+        console.info('ORACLE Suchdiagnose',dealId,traces,data.report?.warnings||[]);
+        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+' gespeichert.'+(count===0?' '+(traces||data.report?.warnings?.join('; ')||'Keine passenden Preisangaben.') : ''),false,count===0);
       }catch(e){
         finishAlbertActivity('oracle-'+id,'ORACLE',e.message||String(e),true);
         showStatus('ORACLE: '+(e.message||e),true);
