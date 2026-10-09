@@ -14,6 +14,10 @@ const VERDICT = {
 
     console.log("[VERDICT] Starte Einkaufsbewertung");
 
+    if (!input.humanFeedback || !["WATCH","DEEP_DIVE","LEARN","REJECT"].includes(input.humanFeedback.action)) {
+      throw new Error("Menschliches Feedback fehlt; VERDICT bleibt gesperrt.");
+    }
+
     const product = input.product || {};
 
     const productName =
@@ -149,6 +153,14 @@ const VERDICT = {
 
     }
 
+    // Human action is a preference, not an A/B/C/X economic grade.
+    const humanAction = input.humanFeedback.action;
+    if (humanAction === "REJECT") recommendation = "ZURUECKSTELLEN";
+    if (humanAction === "DEEP_DIVE") recommendation = "MARKT_VERTIEFEN";
+    if (humanAction === "WATCH") recommendation = "BEOBACHTEN";
+    if (humanAction === "LEARN") recommendation = "WEITER_PRUEFEN";
+    if (input.humanFeedback.comment) risks.push("Menschlicher Hinweis: " + String(input.humanFeedback.comment).slice(0, 500));
+
     // --------------------------------------------------------
     // ERGEBNIS
     // --------------------------------------------------------
@@ -156,6 +168,8 @@ const VERDICT = {
     const result = {
 
       verdict_status: "COMPLETED",
+      verdict_human_action: humanAction,
+      verdict_human_comment: input.humanFeedback.comment || null,
 
       verdict_product_name: productName,
 
