@@ -608,6 +608,8 @@
       document.getElementById('albert-results-count').textContent=String(completedResults.length);
       list.replaceChildren();
       completedResults.forEach(item=>{
+        // Alte Session-Einträge haben noch keine Deal-ID; aus Aufgabenkennung ableiten.
+        item.dealId=item.dealId||(/^(?:deep|oracle)-(\d+)$/.exec(String(item.id||''))||[])[1]||null;
         const button=document.createElement('button');button.type='button';button.className='albert-result-card';
         button.dataset.state=item.state;
         const title=document.createElement('strong');title.className='block text-xs text-slate-800';
@@ -615,7 +617,7 @@
         const line=document.createElement('span');line.className='block text-[10px] text-slate-500 mt-1';
         line.textContent=item.at+' · '+(item.dealId?'Deal #'+item.dealId:'Recherche');
         const detail=document.createElement('span');detail.className='result-detail';
-        detail.textContent=item.message+(item.dealId?' · Klicken: Deal ansehen':' · Klicken: Ergebnisdetails');
+        detail.textContent=item.message+(item.dealId?' · Klicken: Deal ansehen':' · Klicken: Übersicht öffnen');
         button.append(title,line,detail);
         button.title=item.message+(item.dealId?' – zum Deal springen':'');
         if(item.dealId)button.addEventListener('click',async()=>{
@@ -644,28 +646,17 @@
             setTimeout(()=>card.classList.remove('albert-deal-located'),8500);
           } else showStatus('Deal #'+item.dealId+' ist in dieser Ansicht nicht verfügbar.',true);
         });
-        else button.addEventListener('click',()=>{showCompletedResultDetails(item);});
+        else button.addEventListener('click',async()=>{
+          activeDealView=String(item.id||'')==='hunt'?'SOFORT':'INBOX';
+          activeCategoryFilter=null;activeGradeFilter=null;
+          await fetchDeals();
+          document.getElementById('deal-navigation')?.querySelector('[data-view="'+activeDealView+'"]')?.scrollIntoView({block:'nearest'});
+        });
         list.append(button);
       });
     }
-    function showCompletedResultDetails(item) {
-      const modal=document.getElementById('albert-deep-dive-result');
-      if(!modal)return;
-      modal.classList.remove('hidden');modal.classList.add('flex');
-      modal.innerHTML='<div class="absolute inset-0 bg-slate-900/50" data-result-close="true"></div>'+
-        '<section role="dialog" aria-modal="true" aria-label="Albert Arbeitsergebnis" class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">'+
-        '<h2 class="font-semibold text-slate-900">'+escapeHtml(item.label)+'</h2>'+
-        '<p class="mt-2 text-xs text-slate-500">'+escapeHtml(item.at)+' · '+escapeHtml(item.state)+'</p>'+
-        '<p class="mt-4 text-sm text-slate-700 whitespace-pre-wrap">'+escapeHtml(item.message)+'</p>'+
-        '<button type="button" data-result-close="true" class="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-white text-sm">Schließen</button></section>';
-      modal.addEventListener('click',function close(e){
-        if(!e.target.closest('[data-result-close]'))return;
-        modal.classList.add('hidden');modal.classList.remove('flex');modal.replaceChildren();
-        modal.removeEventListener('click',close);
-      });
-    }
     function recordCompletedResult(id,label,message,state) {
-      const match=/^(?:deep|oracle)-(\\d+)$/.exec(id);
+      const match=/^(?:deep|oracle)-(\d+)$/.exec(id);
       const result={id,label,message,state,dealId:match?match[1]:null,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})};
       completedResults.unshift(result);
       completedResults.splice(8);
