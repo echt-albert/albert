@@ -545,12 +545,24 @@
       const panel = document.getElementById('decision-panel-' + dealId);
       if (!panel) return;
       const labels = {WATCH:'Beobachten',DEEP_DIVE:'Markt genauer prüfen',LEARN:'Erfahrung festhalten',REJECT:'Posten ablehnen'};
-      const reasons = ['Zu hoher EK','Nachfrage unklar','Zu viel Kapital','Versand / Retouren','Produktidentität unklar','Aktuell kein Budget','Andere Begründung'];
+      const reasonSets = {
+        WATCH: {question:'Warum beobachten?', reasons:['Preis könnte noch fallen','Nachfrage noch nicht belegt','Weitere Marktprüfung nötig','Lieferantenangebot abwarten','Aktuell keine Priorität','Anderer Grund'], placeholder:'Was müsste sich ändern, damit du kaufen würdest?'},
+        DEEP_DIVE: {question:'Was soll Albert genauer prüfen?', reasons:['Deutschen Marktpreis','Reale Verkäufe / Nachfrage','Wettbewerb und Preisdruck','EAN / Produktidentität','Vollkosten und Marge','Anderer Prüfauftrag'], placeholder:'Konkrete Prüffrage (optional)'},
+        LEARN: {question:'Welche Erkenntnis möchtest du festhalten?', reasons:['Interessante Produktkategorie','Attraktive Einkaufsquelle','Gute Marge / Preisabweichung','Besonderes Risiko','Grundsätzliche Einkaufsregel','Andere Erkenntnis'], placeholder:'Was sollte Albert für ähnliche Deals berücksichtigen?'},
+        REJECT: {question:'Warum nicht kaufen?', reasons:['Einkaufspreis zu hoch','Marge zu gering','Nachfrage zu schwach','Kapitalbindung zu hoch','Versand / Retouren','Compliance / Produktproblem','Anderer Grund'], placeholder:'Weitere Begründung (optional)'}
+      };
+      const config = reasonSets[action];
+      const reasons = config.reasons;
+      const card = document.getElementById('deal-card-' + dealId);
+      const hint = action === 'DEEP_DIVE' && card?.dataset.marketVerified !== 'true'
+        ? 'Hinweis: Ein verifizierter deutscher Gesamtmarktpreis ist für diesen Deal noch nicht hinterlegt.'
+        : action === 'DEEP_DIVE' && card?.dataset.hasEan !== 'true'
+          ? 'Hinweis: Für diesen Deal fehlt noch die EAN.' : '';
       panel.classList.remove('hidden');
       panel.innerHTML = '<div class="text-xs font-semibold text-slate-800 mb-2">Dein nächster Schritt: ' + escapeHtml(labels[action]) + '</div>' +
-        '<p class="text-xs text-slate-600 mb-3">Warum? Ein Grund hilft Albert, ähnliche Fälle später richtig einzuordnen. Optional.</p>' +
+        '<p class="text-xs text-slate-600 mb-3">' + escapeHtml(config.question) + ' <span class="text-slate-400">(optional)</span></p>' + (hint ? '<p class="text-xs text-amber-800 mb-3">' + escapeHtml(hint) + '</p>' : '') +
         '<div class="flex flex-wrap gap-2 mb-3">' + reasons.map((reason,i)=>'<button type="button" class="decision-reason px-2 py-1 rounded-md border border-slate-300 bg-white text-[11px]" data-reason="' + escapeHtml(reason) + '">' + escapeHtml(reason) + '</button>').join('') + '</div>' +
-        '<textarea id="decision-note-' + dealId + '" maxlength="1400" rows="2" placeholder="Weitere Einschätzung (optional)" class="w-full text-xs rounded-lg border border-slate-300 p-2 mb-3"></textarea>' +
+        '<textarea id="decision-note-' + dealId + '" maxlength="1400" rows="2" placeholder="' + escapeHtml(config.placeholder) + '" class="w-full text-xs rounded-lg border border-slate-300 p-2 mb-3"></textarea>' +
         '<div class="flex gap-2 items-center"><button type="button" id="decision-save-' + dealId + '" class="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold">Entscheidung bestätigen</button><button type="button" id="decision-cancel-' + dealId + '" class="px-3 py-2 text-xs text-slate-600">Abbrechen</button></div>' +
         '<p class="text-[11px] text-slate-500 mt-2">Dein Urteil wird zum Deal gespeichert. Es ist kein automatisch bestätigter Marktbeleg.</p>';
       let selectedReason = '';
@@ -860,7 +872,7 @@
 
         return `
 
-          <article id="deal-card-${dealId}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" data-market-verified="${deal.market_deep_dive?.verified_lowest_total_price != null}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             ${progressBanner}
             <!-- DEAL HEADER -->
 
