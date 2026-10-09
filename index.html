@@ -1255,7 +1255,7 @@
                 </h3>
 
                 <p class="text-slate-600 leading-relaxed whitespace-pre-wrap">
-                  ${escapeHtml(deal.human_verdict ? ('VERDICT nach menschlichem Feedback: ' + deal.human_verdict.verdict_grade + ' · ' + deal.human_verdict.verdict_recommendation + '\\n' + (deal.human_verdict.verdict_risks || []).join('\\n') + '\\n\\n') : 'VERDICT wartet auf menschliche Bewertung.\\n\\n') + (deal.decision_reason || 'Keine detaillierte Begründung hinterlegt.'))}
+                  ${escapeHtml(deal.human_verdict ? ('VERDICT: ' + deal.human_verdict.verdict_grade + ' / ' + deal.human_verdict.verdict_recommendation) : 'VERDICT wartet auf Feedback')}
                 </p>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/60 font-mono text-[11px]">
