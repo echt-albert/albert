@@ -867,6 +867,10 @@
                     ${escapeHtml(deal.category || 'Allgemein')}
                   </span>
 
+                  <span class="text-[10px] font-medium uppercase tracking-wider mono px-2 py-0.5 rounded border ${deal.hunt_origin === 'SOFORT' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-100 border-slate-200'}">
+                    ${deal.hunt_origin === 'SOFORT' ? '⚡ Sofort-Jagd' : '↻ Permanente Jagd'}
+                  </span>
+
                   <span class="text-[10px] text-slate-400 mono">
                     Run ID #${escapeHtml(deal.research_run_id || '—')}
                   </span>
@@ -1401,7 +1405,7 @@
       const analysis = data.pipeline?.results;
       if (product.id && analysis) {
         const { error: saveError } = await supabaseClient.from('discoveries')
-          .update({ brain_analysis: analysis }).eq('id', product.id);
+          .update({ brain_analysis: analysis, hunt_origin: 'SOFORT' }).eq('id', product.id);
         if (saveError) throw new Error('Analyse konnte nicht gespeichert werden: ' + saveError.message);
       }
       return data;
