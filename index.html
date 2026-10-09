@@ -35,7 +35,7 @@
     @keyframes albert-spin { to { transform: rotate(360deg); } }
     .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
     .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
-    .deal-compact > :not(.deal-header):not(.deal-compact-summary) { display:none !important; }
+    .deal-compact > :not(.deal-header):not(.deal-compact-summary):not(.deal-status-guidance) { display:none !important; }
     .deal-compact .deal-header { margin-bottom:0 !important; }
     .deal-compact-summary { display:none; }
     .deal-compact .deal-compact-summary { display:flex; }
@@ -594,6 +594,27 @@
       if (verified) return {label:'Markt geprüft', color:'border-emerald-200 bg-emerald-50 text-emerald-800', detail:'Verifizierter Preis hinterlegt'};
       if (hasReport) return {label:'Prüfung offen', color:'border-amber-200 bg-amber-50 text-amber-800', detail:'Markthinweise vorhanden; Verifizierung offen'};
       return {label:'Nicht geprüft', color:'border-slate-200 bg-slate-50 text-slate-500', detail:'Noch kein Deep Dive gespeichert'};
+    }
+    function dealNextStep(deal, feedback, status) {
+      const action = feedback?.action || '';
+      const comment = (feedback?.comment || '').trim();
+      const report = deal.market_deep_dive;
+      const hasPrice = report?.verified_lowest_total_price != null;
+      const running = activeMarketResearch.has(String(deal.id));
+      const date = feedback?.created_at ? new Date(feedback.created_at).toLocaleString('de-DE') : '';
+      let title = 'NEUER DEAL · Noch kein Urteil', result = 'Noch keine Entscheidung dokumentiert.', next = deal.ean_gtin ? 'Deutschen Marktpreis und Nachfrage prüfen.' : 'EAN/MPN und Produktidentität klären.';
+      if (running) { title = 'DEEP DIVE · Läuft'; result = 'Albert recherchiert deutsche Marktangebote.'; next = 'Rechercheergebnis abwarten.'; }
+      else if (action === 'REJECT') { title = 'ABGELEHNT'; result = comment || 'Deal abgelehnt; ohne Begründung.'; next = 'Nicht kaufen. Nur bei geänderten Konditionen erneut prüfen.'; }
+      else if (action === 'WATCH') { title = 'WATCH · Beobachtung'; result = comment || 'Deal zur Beobachtung vorgemerkt.'; next = 'EK, Verfügbarkeit und Nachfrage später erneut prüfen.'; }
+      else if (action === 'LEARN') { title = 'LANGZEITHIRN · Gespeichert'; result = comment || 'Erkenntnis als Feedback gespeichert.'; next = 'Erkenntnis bei ähnlichen Deals berücksichtigen.'; }
+      else if (action === 'DEEP_DIVE' || report) {
+        title = 'DEEP DIVE · ' + status.label;
+        if (status.label === 'Recherchefehler') { result = 'Recherche fehlgeschlagen: ' + status.detail; next = 'Deep Dive erneut starten.'; }
+        else if (hasPrice) { result = 'Verifizierter Gesamtmarktpreis hinterlegt.'; next = 'Vollkosten, Marketingbudget und MAX-EK prüfen.'; }
+        else if (report) { result = 'Markthinweise gespeichert; Marktpreis noch nicht verifiziert.'; next = deal.ean_gtin ? 'Händlerpreise inklusive Versand verifizieren.' : 'EAN klären und Händlerpreise verifizieren.'; }
+        else { result = comment || 'Deep Dive beauftragt; noch kein gespeichertes Marktergebnis.'; next = 'Rechercheergebnis prüfen oder erneut starten.'; }
+      }
+      return {title, result, next, date};
     }
     function showDeepDiveResult(deal, state, message) {
       const modal = document.getElementById('albert-deep-dive-result');
@@ -1244,6 +1265,7 @@
         const grade = escapeHtml(deal.human_verdict?.verdict_grade || deal.decision_grade || '—');
         const deepStatus = deepDiveStatus(deal);
         const latestFeedback = (feedbackRows || []).find(row => String(row.discovery_id) === String(deal.id));
+        const dealGuidance = dealNextStep(deal, latestFeedback, deepStatus);
         const currentAction = dealFolder(deal);
         const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',SOFORT:'Neu',INBOX:'Neu'}[currentAction];
 
@@ -1324,6 +1346,16 @@
 
             </div>
 
+
+            <div class="deal-status-guidance rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4 text-xs" aria-label="Albert-Status und nächster Schritt">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <span class="font-semibold text-slate-800">${escapeHtml(dealGuidance.title)}</span>
+                ${dealGuidance.date ? '<time class="text-[10px] text-slate-400">' + escapeHtml(dealGuidance.date) + '</time>' : ''}
+              </div>
+              <p class="text-slate-600 leading-relaxed"><strong>Ergebnis:</strong> ${escapeHtml(dealGuidance.result)}</p>
+              <p class="text-slate-800 mt-1 leading-relaxed"><strong>Albert empfiehlt:</strong> ${escapeHtml(dealGuidance.next)}</p>
+              <button type="button" data-deal-id="${dealId}" class="deal-guidance-action mt-2 text-amber-800 font-semibold hover:underline">Dein Urteil / nächsten Schritt wählen →</button>
+            </div>
 
             <div class="deal-compact-summary flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
               <span class="font-semibold text-amber-900">${escapeHtml(actionLabel)}</span>
@@ -1770,6 +1802,8 @@
     document.getElementById('deals-container')
       .addEventListener('click', function(event) {
 
+        const guidance = event.target.closest('.deal-guidance-action');
+        if (guidance) { openVerdictChoices(guidance.dataset.dealId); return; }
         const button = event.target.closest('.deal-action');
 
         if (!button) return;
