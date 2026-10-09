@@ -106,6 +106,7 @@
         <button type="button" data-view="INBOX" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
           <span>📥 Intelligence Feed</span><span data-count="INBOX" class="font-mono text-[11px]">–</span>
         </button>
+        <button type="button" data-view="SOFORT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>⚡ Sofort-Jagd</span><span data-count="SOFORT" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="WATCH" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
           <span>👁️ Watch</span><span data-count="WATCH" class="font-mono text-[11px]">–</span>
         </button>
@@ -689,7 +690,7 @@
 
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
     let activeDealView = 'INBOX';
-    const dealViewNames = { INBOX: 'Intelligence Feed', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
+    const dealViewNames = { INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
@@ -700,7 +701,7 @@
     // Offen/geschlossen pro Deal merken, auch bei automatischem Refresh.
     const dealExpansion = new Map();
     function isDealExpanded(id, view) {
-      if (view === 'INBOX') return dealExpansion.get(String(id)) !== false;
+      if (view === 'INBOX' || view === 'SOFORT') return dealExpansion.get(String(id)) !== false;
       return dealExpansion.get(String(id)) === true;
     }
     function toggleDealCard(id) {
@@ -757,8 +758,8 @@
         const key = String(row.discovery_id);
         if (!latestAction.has(key) && ['WATCH','DEEP_DIVE','LEARN','REJECT'].includes(row.action)) latestAction.set(key, row.action);
       }
-      const counts = { INBOX: 0, WATCH: 0, DEEP_DIVE: 0, LEARN: 0, REJECT: 0 };
-      for (const deal of deals || []) counts[latestAction.get(String(deal.id)) || 'INBOX']++;
+      const counts = { INBOX: 0, SOFORT: 0, WATCH: 0, DEEP_DIVE: 0, LEARN: 0, REJECT: 0 };
+      for (const deal of deals || []) { counts[latestAction.get(String(deal.id)) || 'INBOX']++; if (deal.hunt_origin === 'SOFORT') counts.SOFORT++; }
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
       document.querySelectorAll('.deal-view').forEach(button => {
         const selected = button.dataset.view === activeDealView;
@@ -768,7 +769,7 @@
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const visibleDeals = (deals || []).filter(deal => (latestAction.get(String(deal.id)) || 'INBOX') === activeDealView);
+      const visibleDeals = (deals || []).filter(deal => activeDealView === 'SOFORT' ? deal.hunt_origin === 'SOFORT' : (latestAction.get(String(deal.id)) || 'INBOX') === activeDealView);
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
 
@@ -1462,7 +1463,8 @@
           'Finde einen neuen aktuellen B2B-Warenposten.',
           message => showStatus(message, false)
         );
-        showStatus('Vier Brains abgeschlossen · Bitte im Feed bewerten. VERDICT wartet auf dein Feedback.', false);
+        activeDealView = 'SOFORT';
+        showStatus('Sofort-Jagd abgeschlossen · Ergebnisse unter ⚡ Sofort-Jagd.', false);
         setTimeout(fetchDeals, 1500);
       } catch (err) {
         showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
