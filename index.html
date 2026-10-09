@@ -22,6 +22,22 @@
     }
 
 
+    /* Nach Deep Dive: Ziel-Deal für die Orientierung sichtbar hervorheben. */
+    @keyframes albert-deal-locate {
+      0%,100% { box-shadow: 0 0 0 0 rgba(14,165,233,0), 0 2px 5px rgba(15,23,42,.06); }
+      15%,55% { box-shadow: 0 0 0 5px rgba(14,165,233,.33), 0 0 24px rgba(14,165,233,.14); }
+      35%,75% { box-shadow: 0 0 0 9px rgba(14,165,233,.12), 0 0 30px rgba(14,165,233,.10); }
+    }
+    .albert-deal-located {
+      border-color: #0284c7 !important;
+      outline: 2px solid #0284c7;
+      outline-offset: 2px;
+      animation: albert-deal-locate 1.8s ease-in-out 3;
+      scroll-margin-top: 120px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .albert-deal-located { animation: none; }
+    }
     /* Deal-Kacheln: konsistente Leseschrift und klare Label-Hierarchie */
     .deal-divisions > div { font-size: 12px; line-height: 1.55; }
     .deal-divisions > div p,
@@ -637,7 +653,15 @@
         modal.removeEventListener('click', close); document.removeEventListener('keydown', keyClose);
         if (!error) {
           const card = document.getElementById('deal-card-' + deal.id);
-          if (card) card.scrollIntoView({behavior:'smooth',block:'start'});
+          if (card) {
+            document.querySelectorAll('.albert-deal-located').forEach(el => el.classList.remove('albert-deal-located'));
+            card.classList.remove('albert-deal-located');
+            void card.offsetWidth; // Animation bei wiederholtem Aufruf neu starten
+            card.classList.add('albert-deal-located');
+            card.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',block:'center'});
+            clearTimeout(window.albertLocateTimer);
+            window.albertLocateTimer = setTimeout(() => card.classList.remove('albert-deal-located'), 8500);
+          }
         }
       };
       const keyClose = event => { if (event.key === 'Escape') close({target:modal.querySelector('[data-result-close]')}); };
