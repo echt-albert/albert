@@ -731,7 +731,7 @@
       if (has(/garten|pflanz|werkzeug|baumarkt|heimwerk|renovier|sanitar|bauzubehor/)) return 'Garten & Heimwerken';
       if (has(/buromaterial|burobedarf|schreibwaren|ordner|papier|druckerzubehor|toner|tinte/)) return 'Büro & Schreibwaren';
       if (has(/tierbedarf|haustier|hund|katze|aquarium/)) return 'Tierbedarf';
-      if (has(/auto|kfz|fahrzeug|motorrad|reifen/)) return 'Auto & Mobilität';
+      if (has(/\\bauto\\b|kfz|fahrzeug|motorrad|reifen/)) return 'Auto & Mobilität';
       if (has(/mobel|einrichtung|wohnen|dekoration|leuchten|lampen|bett|matratze|heimtextil/)) return 'Wohnen & Einrichtung';
       if (has(/computer|smartphone|telefon|tablet|notebook|laptop|gaming|audio|fernseher|unterhaltungselektronik|it.zubehor/)) return 'Elektronik & IT';
       if (has(/lebensmittel|nahrung|getrank|susswaren|drogerie|waschmittel|reiniger|hygiene/)) return 'Lebensmittel & Drogerie';
