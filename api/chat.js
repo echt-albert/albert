@@ -628,12 +628,6 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({
-      error: "API-Key fehlt."
-    });
-  }
-
   const { messages, mode = "chat" } = req.body || {};
 
   if (!Array.isArray(messages) || !messages.length) {
@@ -660,13 +654,12 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  // Phase 1: ausdruecklicher Pipeline-Aufruf; normaler Chat bleibt unveraendert.
-  // Aktivierung erst nach End-to-End-Test im geschuetzten Branch.
-  if (mode === "pipeline") {
-    const lastUserMessage = [...valid].reverse().find(m => m.role === "user");
-    const query = lastUserMessage?.content?.trim();
+  const lastUserMessage = [...valid].reverse().find(m => m.role === "user");
+  const query = lastUserMessage?.content?.trim() || "";
+  // Deterministic routing: research requests execute real divisions, not a text-only LLM.
+  const researchIntent = /\\b(recherchier\\w*|such\\w*|find\\w*|jagd|sofort.jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\\w*|sourcing)\\b/i.test(query);
+  if (mode === "pipeline" || (mode !== "chat_only" && researchIntent)) {
     if (!query) return res.status(400).json({ error: "Rechercheauftrag fehlt." });
-
     try {
       const pipeline = await Albert.run({ query });
       if (!pipeline.success) {
@@ -676,19 +669,29 @@ module.exports = async function handler(req, res) {
           executionLog: pipeline.executionLog
         });
       }
+      const product = pipeline.results.RADAR?.product;
+      const verdict = pipeline.results.VERDICT || {};
+      const radarStatus = pipeline.results.RADAR?.radar_status || "COMPLETED";
+      const message = product
+        ? [product.product_name || "Warenposten",
+           "Bewertung: " + (verdict.verdict_grade || "B"),
+           verdict.verdict_message || "Weitere Prüfung erforderlich.",
+           "Marktpreise und Nachfrage sind noch nicht unabhängig verifiziert."].join(" · ")
+        : "Recherche beendet (" + radarStatus + "). Kein neuer prüfbarer Warenposten vorhanden.";
       return res.status(200).json({
         success: true,
         mode: "pipeline",
         pipeline,
-        choices: [{ index: 0, message: {
-          role: "assistant",
-          content: "Die fünf Brains haben den Auftrag verarbeitet. Die strukturierten Ergebnisse stehen im Feld pipeline."
-        }, finish_reason: "stop" }]
+        choices: [{ index: 0, message: { role: "assistant", content: message }, finish_reason: "stop" }]
       });
     } catch (error) {
       console.error("[ALBERT] Pipeline-Fehler:", error);
       return res.status(500).json({ error: "Die Brain-Pipeline konnte nicht ausgeführt werden." });
     }
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: "API-Key fehlt." });
   }
 
   const analysisMode = mode === "analyse";
