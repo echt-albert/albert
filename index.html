@@ -863,6 +863,41 @@
         portraitRequests.delete(key);
       }
     }
+    const audienceRequests = new Map();
+    async function loadTargetAudience(id) {
+      const key = String(id);
+      const target = document.getElementById('target-audience-' + key);
+      if (!target || audienceRequests.has(key)) return;
+      audienceRequests.set(key, true);
+      target.textContent = 'Albert ermittelt mögliche Käufergruppen …';
+      try {
+        const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key}});
+        if(error || data?.status !== 'ready') throw error || new Error('Audience unavailable');
+        const node = document.getElementById('target-audience-' + key);
+        if(!node) return;
+        node.replaceChildren();
+        const section = (title,items) => {
+          const wrap=document.createElement('div');
+          const label=document.createElement('div');
+          label.className='text-[10px] font-semibold uppercase tracking-wider text-slate-500 mono mb-1';
+          label.textContent=title;
+          wrap.appendChild(label);
+          const p=document.createElement('p');
+          p.className='text-[12px] leading-relaxed text-slate-700';
+          p.textContent=Array.isArray(items)?items.join(' · '):String(items||'—');
+          wrap.appendChild(p);
+          node.appendChild(wrap);
+        };
+        section('Primäre Zielgruppe',data.primary_audience);
+        section('Weitere Zielgruppen',data.other_audiences);
+        section('Kaufmotive',data.buying_motives);
+      } catch(e) {
+        console.warn('Zielgruppen nicht abrufbar:',e);
+        const node=document.getElementById('target-audience-'+key);
+        if(node) node.textContent='Zielgruppenanalyse momentan nicht abrufbar.';
+        audienceRequests.delete(key);
+      }
+    }
     function toggleDealCard(id) {
       const key = String(id);
       const card = document.getElementById('deal-card-' + key);
@@ -870,7 +905,7 @@
       const open = card.classList.contains('deal-compact');
       dealExpansion.set(key, open);
       card.classList.toggle('deal-compact', !open);
-      if (open) loadProductPortrait(key);
+      if (open) { loadProductPortrait(key); loadTargetAudience(key); }
       const button = card.querySelector('.deal-expand');
       if (button) {
         button.textContent = open ? 'Einklappen ↑' : 'Aufklappen ↓';
@@ -1420,6 +1455,18 @@
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKTPORTRÄT</span>
                 </div>
                 <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Beim Aufklappen recherchiert Albert ein individuelles Produktporträt.</span>'}</p>
+              </div>
+
+              <!-- ZIELGRUPPEN -->
+              <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · ZIELGRUPPEN</span>
+                </div>
+                <div id="target-audience-${dealId}" class="space-y-3 text-[12px] leading-relaxed text-slate-700">
+                  <span class="text-slate-400">Beim Aufklappen ermittelt Albert mögliche Zielgruppen und Kaufmotive.</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-3">KI-basierte Hypothesen · keine nachgewiesenen Käuferdaten</p>
               </div>
 
             </div>
