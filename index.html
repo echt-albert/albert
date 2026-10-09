@@ -21,6 +21,9 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
+    @keyframes albert-spin { to { transform: rotate(360deg); } }
+    .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
+    .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
     /* Intelligence Feed links, Albert rechts */
     .albert-layout {
       display: grid;
@@ -527,6 +530,12 @@
     // DEAL BEWERTEN
     // =======================================================
 
+    const activeMarketResearch = new Map();
+    function updateMarketResearch(dealId, message) {
+      activeMarketResearch.set(String(dealId), message);
+      const el = document.getElementById('market-progress-' + dealId);
+      if (el) el.innerHTML = '<span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(message) + '</span>';
+    }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
       const comment = window.prompt('Deine Einschätzung zu diesem Posten (optional):', '');
@@ -541,8 +550,15 @@
           .insert({ discovery_id: dealId, ...feedback });
         if (feedbackError) throw feedbackError;
         if (action === 'DEEP_DIVE') {
+          activeMarketResearch.set(String(dealId), 'ORACLE recherchiert deutsche Marktangebote …');
+          activeDealView = 'DEEP_DIVE';
           await fetchDeals();
-          showStatus('Deep Dive Market: Gemini recherchiert deutsche Marktquellen …', false);
+          showStatus('Deep Dive Market läuft – bitte warten …', false);
+          const researchStages = ['ORACLE sucht deutsche Händler und Preise …','ORACLE prüft Quellen und Produktidentität …','ORACLE sammelt Nachfragesignale …'];
+          let stage = 0;
+          const progressTimer = setInterval(() => {
+            if (stage < researchStages.length) updateMarketResearch(dealId, researchStages[stage++]);
+          }, 5000);
           try {
             const researchResponse = await fetch(SUPABASE_URL + '/functions/v1/albert-market', {
               method:'POST', headers:{'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY},
@@ -553,9 +569,12 @@
             const {error:saveError}=await supabaseClient.from('discoveries')
               .update({market_deep_dive:researchData.report}).eq('id',dealId);
             if(saveError) throw saveError;
-            showStatus('Deep Dive: Quellen gesammelt. Preise und Nachfrage sind noch nicht verifiziert.',false);
+            showStatus('Deep Dive abgeschlossen: Recherchehinweise gespeichert, noch nicht verifiziert.',false);
           } catch(researchError) {
             showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
+          } finally {
+            clearInterval(progressTimer);
+            activeMarketResearch.delete(String(dealId));
           }
           await fetchDeals();
           return;
@@ -702,6 +721,8 @@
 
       container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
+        const progressMessage = activeMarketResearch.get(String(deal.id));
+        const progressBanner = progressMessage ? '<div id="market-progress-' + escapeHtml(String(deal.id)) + '" class="albert-working" role="status" aria-live="polite"><span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(progressMessage) + '</span></div>' : '';
         const rawPrices = Array.isArray(deal.market_prices)
           ? deal.market_prices
           : [];
@@ -784,7 +805,7 @@
         return `
 
           <article class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-
+            ${progressBanner}
             <!-- DEAL HEADER -->
 
             <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
