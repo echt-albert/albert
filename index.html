@@ -723,7 +723,10 @@
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
-      activeDealView = button.dataset.view;
+      const nextView = button.dataset.view;
+      // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
+      dealExpansion.clear();
+      activeDealView = nextView;
       activeCategoryFilter = null;
       fetchDeals();
     });
