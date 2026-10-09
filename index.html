@@ -490,33 +490,43 @@
     // =======================================================
 
     function toggleDeepDive(id) {
+      const button = document.getElementById('btn-text-' + id);
+      const dealId = button?.closest('[data-deal-id]')?.dataset.dealId;
+      if (dealId) openVerdictChoices(dealId);
+    }
 
-      const panel = document.getElementById(
-        `deep-dive-${id}`
-      );
-
-      const btnText = document.getElementById(
-        `btn-text-${id}`
-      );
-
-      if (!panel || !btnText) return;
-
-      if (panel.classList.contains('hidden')) {
-
-        panel.classList.remove('hidden');
-
-        btnText.textContent =
-          'Details einklappen ↑';
-
-      } else {
-
-        panel.classList.add('hidden');
-
-        btnText.textContent =
-          'Dein Urteil ↓';
-
-      }
-
+    function openVerdictChoices(dealId) {
+      const panel = document.getElementById('albert-decision-modal');
+      if (!panel || !panel.classList.contains('hidden')) return;
+      const card = document.getElementById('deal-card-' + dealId);
+      if (!card) return;
+      const product = card.querySelector('h2, h3')?.textContent?.trim() || 'Deal';
+      panel.classList.remove('hidden'); panel.classList.add('flex');
+      panel.innerHTML = '<div class="absolute inset-0 bg-slate-900/40" data-modal-close="true"></div>' +
+        '<section role="dialog" aria-modal="true" aria-labelledby="verdict-choices-title" class="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">' +
+        '<div class="flex items-start justify-between gap-3"><div><div class="text-[10px] uppercase tracking-widest text-slate-400 font-mono">Entscheidung zum Deal</div><h2 id="verdict-choices-title" class="text-lg font-semibold text-slate-900">Dein Urteil</h2><p class="mt-1 text-xs text-slate-500">' + escapeHtml(product) + '</p></div><button type="button" data-modal-close="true" aria-label="Schließen" class="text-xl text-slate-400 hover:text-slate-800">×</button></div>' +
+        '<p class="my-4 text-sm text-slate-600">Was möchtest du mit diesem Deal machen?</p>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+        [['WATCH','👁️ Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn (Lernen)'],['REJECT','❌ Zunächst ablehnen']].map(([value,label]) =>
+          '<button type="button" data-verdict-choice="' + value + '" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-amber-50 hover:border-amber-300">' + label + '</button>').join('') +
+        '</div><button type="button" data-modal-close="true" class="mt-4 text-xs text-slate-500 hover:text-slate-900">Abbrechen</button></section>';
+      const close = () => {
+        panel.classList.add('hidden'); panel.classList.remove('flex'); panel.innerHTML = '';
+        panel.removeEventListener('click', onClick);
+        document.removeEventListener('keydown', onKey);
+      };
+      const onKey = event => { if (event.key === 'Escape') close(); };
+      const onClick = event => {
+        const choice = event.target.closest('[data-verdict-choice]');
+        if (choice) {
+          const action = choice.dataset.verdictChoice;
+          close();
+          rateDeal(dealId, action);
+        } else if (event.target.closest('[data-modal-close]')) close();
+      };
+      panel.addEventListener('click', onClick);
+      document.addEventListener('keydown', onKey);
+      panel.querySelector('[data-verdict-choice]')?.focus();
     }
 
 
@@ -1304,13 +1314,9 @@
                 </div>
 
                 ${`<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>`}
-                <button
-                  onclick="toggleDeepDive('${cardId}')"
-                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
-                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
-                >
+                <button type="button" data-deal-id="${dealId}" onclick="toggleDeepDive('${cardId}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer">
                   <span id="btn-text-${cardId}">
-                    Dein Urteil ↓
+                    Dein Urteil ↗
                   </span>
                 </button>
 
@@ -1656,54 +1662,6 @@
                   </div>
                   <p class="text-slate-500">Quelle: ${escapeHtml(deal.market_deep_dive.source)} · Preis-/Versandangaben sind Suchtreffer, keine geprüften Händlerangebote.</p>
                 </div>` : ''}
-
-              <!-- AKTIONEN -->
-
-              <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200/50 space-y-2">
-
-                <span class="font-mono font-bold text-amber-900 uppercase tracking-wider text-[10px] block">
-                  Dein nächster Schritt
-                </span>
-
-                <div class="flex flex-wrap gap-2 pt-1">
-
-                  <button
-                    data-deal-id="${dealId}"
-                    data-action="WATCH"
-                    class="deal-action px-3 py-1.5 rounded-lg bg-white hover:bg-cyan-50 text-cyan-800 border border-cyan-200 text-[11px] font-mono transition-colors cursor-pointer"
-                  >
-                    👁️ Watch
-                  </button>
-
-                  <button
-                    data-deal-id="${dealId}"
-                    data-action="DEEP_DIVE"
-                    class="deal-action px-3 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 text-[11px] font-mono transition-colors cursor-pointer"
-                  >
-                    📊 Deep Dive Market
-                  </button>
-
-                  <button
-                    data-deal-id="${dealId}"
-                    data-action="LEARN"
-                    class="deal-action px-3 py-1.5 rounded-lg bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-mono transition-colors cursor-pointer"
-                  >
-                    🧠 Langzeithirn (Lernen)
-                  </button>
-
-                  <button
-                    data-deal-id="${dealId}"
-                    data-action="REJECT"
-                    class="deal-action px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-mono transition-colors cursor-pointer"
-                  >
-                    ❌ Zunächst ablehnen
-                  </button>
-
-                </div>
-
-                <p class="text-[11px] text-slate-600 mt-2">Wähle eine Aktion. Albert fragt nur nach einer optionalen Begründung.</p>
-              </div>
-
 
               <!-- LOG -->
 
