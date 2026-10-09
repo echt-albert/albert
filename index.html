@@ -24,6 +24,10 @@
     @keyframes albert-spin { to { transform: rotate(360deg); } }
     .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
     .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
+    .deal-compact > :not(.deal-header):not(.deal-compact-summary) { display:none !important; }
+    .deal-compact .deal-header { margin-bottom:0 !important; }
+    .deal-compact-summary { display:none; }
+    .deal-compact .deal-compact-summary { display:flex; }
     /* Intelligence Feed links, Albert rechts */
     .albert-layout {
       display: grid;
@@ -681,6 +685,26 @@
       fetchDeals();
     });
 
+    // Offen/geschlossen pro Deal merken, auch bei automatischem Refresh.
+    const dealExpansion = new Map();
+    function isDealExpanded(id, view) {
+      if (view === 'INBOX') return dealExpansion.get(String(id)) !== false;
+      return dealExpansion.get(String(id)) === true;
+    }
+    function toggleDealCard(id) {
+      const key = String(id);
+      const card = document.getElementById('deal-card-' + key);
+      if (!card) return;
+      const open = card.classList.contains('deal-compact');
+      dealExpansion.set(key, open);
+      card.classList.toggle('deal-compact', !open);
+      const button = card.querySelector('.deal-expand');
+      if (button) {
+        button.textContent = open ? 'Einklappen ↑' : 'Aufklappen ↓';
+        button.setAttribute('aria-expanded', String(open));
+      }
+    }
+
     async function fetchDeals() {
 
       const container =
@@ -711,7 +735,7 @@
       }
 
       const { data: feedbackRows, error: feedbackReadError } = await supabaseClient
-        .from('deal_feedback').select('discovery_id,action,id').order('id', { ascending: false });
+        .from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id', { ascending: false });
       if (feedbackReadError) {
         container.innerHTML = '<div class="p-5 text-rose-600 text-sm">Deal-Ablagen konnten nicht geladen werden: ' + escapeHtml(feedbackReadError.message) + '</div>';
         return;
@@ -807,6 +831,12 @@
         const cardId = index;
 
         const dealId = escapeHtml(deal.id || '');
+        const expanded = isDealExpanded(deal.id, activeDealView);
+        const compact = !expanded;
+        const grade = escapeHtml(deal.human_verdict?.verdict_grade || deal.decision_grade || '—');
+        const latestFeedback = (feedbackRows || []).find(row => String(row.discovery_id) === String(deal.id));
+        const currentAction = latestAction.get(String(deal.id)) || 'INBOX';
+        const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',INBOX:'Neu'}[currentAction];
 
         const offerUrl = safeUrl(deal.offer_url);
 
@@ -830,11 +860,11 @@
 
         return `
 
-          <article class="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             ${progressBanner}
             <!-- DEAL HEADER -->
 
-            <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+            <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
 
               <div class="min-w-0">
 
@@ -874,8 +904,10 @@
 
                 </div>
 
+                ${activeDealView !== 'INBOX' ? `<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>` : ''}
                 <button
                   onclick="toggleDeepDive('${cardId}')"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
                   class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
                 >
                   <span id="btn-text-${cardId}">
@@ -887,6 +919,13 @@
 
             </div>
 
+
+            <div class="deal-compact-summary flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+              <span class="font-semibold text-amber-900">${escapeHtml(actionLabel)}</span>
+              <span>EK: ${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'unbekannt'}</span>
+              <span>Urteil: ${grade}</span>
+              ${latestFeedback?.comment ? `<span class="truncate max-w-[360px]" title="${escapeHtml(latestFeedback.comment)}">${escapeHtml(latestFeedback.comment)}</span>` : ''}
+            </div>
 
             <!-- FÜNF DIVISIONEN -->
 
