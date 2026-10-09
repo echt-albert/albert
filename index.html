@@ -549,26 +549,19 @@
 
       try {
 
-        const response = await fetch('/api/chat', {
-
-          method: 'POST',
-
-          headers: {
-            'Content-Type': 'application/json'
-          },
-
-          body: JSON.stringify({
-            messages: chatMessages.slice(-20)
-          })
-
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          throw new Error(
-            data.error || `HTTP ${response.status}`
-          );
+        const isResearch = /\b(recherchier\w*|such\w*|find\w*|jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\w*|sourcing)\b/i.test(text);
+        let data;
+        if (isResearch) {
+          appendChatMessage('Albert', 'RADAR recherchiert im Hintergrund. Das kann etwa eine Minute dauern.', 'albert');
+          data = await runBrainResearch(text);
+        } else {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: chatMessages.slice(-20), mode: 'chat_only' })
+          });
+          data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
         }
 
         const reply =
