@@ -668,7 +668,7 @@
         }
         const response = await fetch('/api/chat', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'human_verdict', feedback,
+          body: JSON.stringify({ mode: 'human_verdict', messages: [{ role: 'user', content: 'Bewerte menschliches Feedback' }], feedback,
             analysis: deal.brain_analysis, product: deal })
         });
         const result = await response.json();
