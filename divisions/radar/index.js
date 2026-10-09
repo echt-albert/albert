@@ -38,7 +38,7 @@ const RADAR = {
 
         body: JSON.stringify({ query }),
 
-        signal: AbortSignal.timeout(120000)
+        signal: AbortSignal.timeout(50000)
       }
     );
 
