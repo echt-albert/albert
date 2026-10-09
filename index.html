@@ -835,6 +835,34 @@
     function isDealExpanded(id, view) {
       return dealExpansion.get(String(id)) === true;
     }
+    const portraitRequests = new Map();
+    async function loadProductPortrait(id) {
+      const key = String(id);
+      const target = document.getElementById('product-portrait-' + key);
+      if (!target || portraitRequests.has(key)) return;
+      portraitRequests.set(key, true);
+      target.textContent = 'Albert recherchiert die wichtigsten Merkmale dieses Modells …';
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('albert-product-portrait', {
+          body: { deal_id: key }
+        });
+        if (error) throw error;
+        const current = document.getElementById('product-portrait-' + key);
+        if (!current) return;
+        if (data?.status === 'ready' && data.portrait) {
+          current.textContent = data.portrait;
+        } else if (data?.status === 'pending') {
+          current.textContent = 'Produktporträt wird recherchiert. Bitte den Deal in Kürze erneut öffnen.';
+        } else {
+          current.textContent = 'Für dieses Modell konnten noch keine ausreichend verlässlichen Merkmale bestätigt werden.';
+        }
+      } catch (error) {
+        console.warn('Produktporträt nicht verfügbar:', error);
+        const current = document.getElementById('product-portrait-' + key);
+        if (current) current.textContent = 'Produktporträt momentan nicht abrufbar.';
+        portraitRequests.delete(key);
+      }
+    }
     function toggleDealCard(id) {
       const key = String(id);
       const card = document.getElementById('deal-card-' + key);
@@ -842,6 +870,7 @@
       const open = card.classList.contains('deal-compact');
       dealExpansion.set(key, open);
       card.classList.toggle('deal-compact', !open);
+      if (open) loadProductPortrait(key);
       const button = card.querySelector('.deal-expand');
       if (button) {
         button.textContent = open ? 'Einklappen ↑' : 'Aufklappen ↓';
@@ -878,6 +907,7 @@
 
       }
 
+      portraitRequests.clear();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
       const { data: savedCategories, error: categoryError } = await supabaseClient
         .from('deal_category_labels').select('discovery_id,category');
@@ -1389,7 +1419,7 @@
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKTPORTRÄT</span>
                 </div>
-                <p class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Für dieses konkrete Modell liegen noch keine belastbaren Produktdetails vor. Das Porträt wird ergänzt, sobald CIPHER entsprechende Informationen liefert.</span>'}</p>
+                <p id="product-portrait-${cardId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Beim Aufklappen recherchiert Albert ein individuelles Produktporträt.</span>'}</p>
               </div>
 
             </div>
