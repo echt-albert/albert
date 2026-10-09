@@ -38,6 +38,24 @@
     @media (prefers-reduced-motion: reduce) {
       .albert-deal-located { animation: none; }
     }
+    /* Stapel echter Statuskarten: oberste Aufgabe im Fokus, weitere sichtbar versetzt. */
+    .albert-task-stack { position:relative; isolation:isolate; }
+    .albert-task-card { position:relative; width:100%; text-align:left; border:1px solid #cbd5e1; border-radius:16px; padding:13px 14px; background:#fff; box-shadow:0 4px 14px rgba(15,23,42,.08); transition:transform .3s ease, box-shadow .3s ease, border-color .3s ease; cursor:pointer; overflow-wrap:anywhere; }
+    .albert-task-card + .albert-task-card { margin-top:-52px; }
+    .albert-task-card[data-top="true"] { border-color:#67e8f9; background:#ecfeff; box-shadow:0 8px 22px rgba(8,145,178,.12); }
+    .albert-task-card:focus-visible { outline:2px solid #0284c7; outline-offset:3px; }
+    .albert-task-card:hover { transform:translateY(-4px); }
+    .albert-task-card .task-title { display:block; font:600 11px 'JetBrains Mono',monospace; color:#155e75; }
+    .albert-task-card .task-message { display:block; font-size:10px; line-height:1.5; margin-top:6px; color:#475569; }
+    .albert-task-card .task-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#06b6d4; margin-right:7px; }
+    .albert-task-card[data-state="working"] .task-dot { animation:pulse 1.5s infinite; }
+    .albert-task-card[data-state="success"] { border-color:#86efac; background:#f0fdf4; }
+    .albert-task-card[data-state="success"] .task-dot { background:#16a34a; }
+    .albert-task-card[data-state="warning"] { border-color:#fcd34d; background:#fffbeb; }
+    .albert-task-card[data-state="warning"] .task-dot { background:#d97706; }
+    .albert-task-card[data-state="error"] { border-color:#fda4af; background:#fff1f2; }
+    .albert-task-card[data-state="error"] .task-dot { background:#e11d48; animation:none; }
+    @media(prefers-reduced-motion:reduce){.albert-task-card,.albert-task-card .task-dot{transition:none!important;animation:none!important}}
     /* Deal-Kacheln: konsistente Leseschrift und klare Label-Hierarchie */
     .deal-divisions > div { font-size: 12px; line-height: 1.55; }
     .deal-divisions > div p,
@@ -183,6 +201,7 @@
           <div id="albert-activity-message" class="text-[10px] text-slate-500 mt-1 break-words leading-relaxed">Wartet auf den nächsten Rechercheauftrag.</div>
         </div>
       </div>
+      <div id="albert-task-stack" class="albert-task-stack mt-3" aria-label="Alberts laufende Aufgaben" aria-live="polite"></div>
     </div>
 
   </aside>
@@ -568,28 +587,70 @@
     function resetPulse() {
       if (!activeTasks.size) paintPulse('ready', 'ALBERT BEREIT', 'Wartet auf den nächsten Rechercheauftrag.');
     }
+    const recentTasks = new Map();
+    let chosenTask = null;
+    let taskSequence = 0;
+    function renderTaskStack() {
+      const stack = document.getElementById('albert-task-stack');
+      if (!stack) return;
+      const items = [...activeTasks.entries()].map(([key,task])=>({key,...task,state:'working'}))
+        .concat([...recentTasks.entries()].map(([key,task])=>({key,...task})))
+        .sort((a,b)=>(a.sequence||0)-(b.sequence||0));
+      if (!items.length) { stack.replaceChildren(); return; }
+      const selected = items.find(item=>item.key===chosenTask);
+      const ordered = selected ? items.filter(item=>item.key!==chosenTask).concat(selected) : items;
+      stack.replaceChildren();
+      ordered.forEach((task,index)=>{
+        const card=document.createElement('button');
+        card.type='button';card.className='albert-task-card';
+        card.dataset.state=task.state;
+        card.dataset.top=String(index===ordered.length-1);
+        card.style.zIndex=String(index+1);
+        card.style.marginLeft=(index===ordered.length-1?0:Math.min(ordered.length-index-1,3)*3)+'px';
+        card.style.width='calc(100% - '+(index===ordered.length-1?0:Math.min(ordered.length-index-1,3)*3)+'px)';
+        card.setAttribute('aria-label',task.label+': '+task.message);
+        const heading=document.createElement('span');heading.className='task-title';
+        const dot=document.createElement('span');dot.className='task-dot';dot.setAttribute('aria-hidden','true');
+        heading.append(dot,document.createTextNode(task.label+(task.state==='working'?' · läuft':task.state==='error'?' · Fehler':task.state==='warning'?' · prüfen':' · fertig')));
+        const message=document.createElement('span');message.className='task-message';message.textContent=task.message;
+        card.append(heading,message);
+        card.addEventListener('click',()=>{chosenTask=task.key;renderTaskStack();});
+        stack.append(card);
+      });
+    }
     function renderAlbertActivity() {
+      renderTaskStack();
       if (!activeTasks.size) { resetPulse(); return; }
       clearTimeout(pulseNoticeTimer);
       pulseVersion++;
       const tasks = [...activeTasks.values()];
-      paintPulse('working', 'ALBERT ARBEITET', tasks.map(t => t.label + ': ' + t.message).join(' · '), tasks.length > 1 ? ' · ' + tasks.length + ' Vorgänge' : '');
+      paintPulse('working','ALBERT ARBEITET',tasks.length===1?tasks[0].label+': '+tasks[0].message:tasks.length+' Aufgaben parallel · Karten im Stapel anklicken',tasks.length>1?' · '+tasks.length+' Vorgänge':'');
     }
-    function setAlbertActivity(key, label, message) {
-      activeTasks.set(String(key), {label, message});
+    function setAlbertActivity(key,label,message) {
+      const id=String(key);
+      const previous=activeTasks.get(id);
+      recentTasks.delete(id);
+      activeTasks.set(id,{label,message,sequence:previous?.sequence||++taskSequence});
+      chosenTask=id;
       renderAlbertActivity();
     }
-    function showPulseNotice(title, message, state) {
+    function showPulseNotice(title,message,state) {
       if (activeTasks.size) return;
       clearTimeout(pulseNoticeTimer);
-      const version = ++pulseVersion;
-      paintPulse(state, title, message);
-      pulseNoticeTimer = setTimeout(() => { if (!activeTasks.size && pulseVersion === version) resetPulse(); }, 8000);
+      const version=++pulseVersion;
+      paintPulse(state,title,message);
+      pulseNoticeTimer=setTimeout(()=>{if(!activeTasks.size&&pulseVersion===version)resetPulse();},8000);
     }
-    function finishAlbertActivity(key, label, message, failed = false, incomplete = false) {
-      activeTasks.delete(String(key));
-      if (activeTasks.size) { renderAlbertActivity(); return; }
-      showPulseNotice(failed ? 'MISSION NICHT ABGESCHLOSSEN' : incomplete ? 'WEITERE DATEN BENÖTIGT' : 'MISSION ABGESCHLOSSEN ✓', label + ': ' + message, failed ? 'error' : incomplete ? 'warning' : 'success');
+    function finishAlbertActivity(key,label,message,failed=false,incomplete=false) {
+      const id=String(key);
+      const old=activeTasks.get(id);
+      activeTasks.delete(id);
+      const state=failed?'error':incomplete?'warning':'success';
+      recentTasks.set(id,{label,message,state,sequence:old?.sequence||++taskSequence});
+      chosenTask=id;
+      if(!failed) setTimeout(()=>{recentTasks.delete(id);if(chosenTask===id)chosenTask=null;renderAlbertActivity();},8000);
+      renderAlbertActivity();
+      if(!activeTasks.size)showPulseNotice(failed?'MISSION NICHT ABGESCHLOSSEN':incomplete?'WEITERE DATEN BENÖTIGT':'MISSION ABGESCHLOSSEN ✓',label+': '+message,state);
     }
     const deepDiveLastRun = new Map();
     const deepDiveStatusKey = id => 'albert-deep-dive-status-' + String(id);
