@@ -217,11 +217,6 @@
 
         <div class="min-w-0">
 
-          <div
-            id="status-banner"
-            class="hidden mb-6 p-4 rounded-2xl text-xs mono">
-          </div>
-
           <div id="deals-container" class="space-y-6">
 
             <div class="text-center py-24 text-slate-400 text-sm mono">
@@ -354,22 +349,17 @@
     // =======================================================
 
     function showStatus(text, isError = false) {
-
-      const banner = document.getElementById('status-banner');
-
-      banner.className =
-        `mb-6 p-4 rounded-2xl text-xs mono border ${
-          isError
-            ? 'bg-rose-50 border-rose-200 text-rose-700'
-            : 'bg-cyan-50 border-cyan-200 text-cyan-800'
-        }`;
-
-      banner.textContent = text;
-
-      banner.classList.remove('hidden');
-
+      // Meldungen bleiben im rechten Aktivitätsbereich; kein zweiter Banner über den Deals.
+      const bar = document.getElementById('albert-activity');
+      if (!bar || activeTasks.size) return;
+      bar.classList.remove('hidden');
+      document.getElementById('albert-activity-count').textContent = '';
+      document.getElementById('albert-activity-message').textContent = (isError ? '⚠ ' : '✓ ') + text;
+      clearTimeout(window.albertStatusHideTimer);
+      window.albertStatusHideTimer = setTimeout(() => {
+        if (!activeTasks.size) bar.classList.add('hidden');
+      }, 12000);
     }
-
 
     // =======================================================
     // ALBERT CHAT
