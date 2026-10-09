@@ -657,7 +657,7 @@ module.exports = async function handler(req, res) {
   const lastUserMessage = [...valid].reverse().find(m => m.role === "user");
   const query = lastUserMessage?.content?.trim() || "";
   // Deterministic routing: research requests execute real divisions, not a text-only LLM.
-  const researchIntent = /\\b(recherchier\\w*|such\\w*|find\\w*|jagd|sofort.jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\\w*|sourcing)\\b/i.test(query);
+  const researchIntent = /\b(recherchier\w*|such\w*|find\w*|jagd|sofort.jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\w*|sourcing)\b/i.test(query);
   if (mode === "pipeline" || (mode !== "chat_only" && researchIntent)) {
     if (!query) return res.status(400).json({ error: "Rechercheauftrag fehlt." });
     try {
