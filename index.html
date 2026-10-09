@@ -854,7 +854,7 @@
         (selected ? 'text-amber-800' : 'text-slate-400') + '">' + count + '</span></button>';
       document.getElementById('category-filters').innerHTML =
         categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
-        [...categoryCounts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'de'))
+        [...categoryCounts.entries()].sort((a,b) => a[0].localeCompare(b[0],'de'))
           .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
       const categoryOptions = [...new Set([...knownCategories, ...categoryCounts.keys()])]
         .sort((a,b) => a.localeCompare(b,'de'));
