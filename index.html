@@ -726,7 +726,8 @@
       const button = event.target.closest('[data-view]');
       if (!button) return;
       const nextView = button.dataset.view;
-      if (nextView !== activeDealView) dealExpansion.clear();
+      // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
+      dealExpansion.clear();
       activeDealView = nextView;
       activeCategoryFilter = null;
       fetchDeals();
