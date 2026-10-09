@@ -618,21 +618,22 @@
         detail.textContent=item.message+(item.dealId?' · Klicken: Deal ansehen':' · Klicken: Ergebnisdetails');
         button.append(title,line,detail);
         button.title=item.message+(item.dealId?' – zum Deal springen':'');
-        if(item.dealId)button.addEventListener('click',async()=>{
+        const targetDealId=item.dealId || /^(?:deep|oracle)-(\d+)$/.exec(String(item.id||''))?.[1];
+        if(targetDealId)button.addEventListener('click',async()=>{
           // Ergebnisse können aus jeder Deal-Ablage stammen; zuerst dort suchen,
           // wo der Deal tatsächlich liegt, statt pauschal Deep Dive zu öffnen.
-          let card=document.getElementById('deal-card-'+item.dealId);
+          let card=document.getElementById('deal-card-'+targetDealId);
           if(!card){
             activeDealView='INBOX';
             activeCategoryFilter=null;activeGradeFilter=null;
             await fetchDeals();
-            card=document.getElementById('deal-card-'+item.dealId);
+            card=document.getElementById('deal-card-'+targetDealId);
           }
           if(!card){
             for(const view of ['DEEP_DIVE','WATCH','LEARN','REJECT','SOFORT']){
               activeDealView=view;
               await fetchDeals();
-              card=document.getElementById('deal-card-'+item.dealId);
+              card=document.getElementById('deal-card-'+targetDealId);
               if(card)break;
             }
           }
@@ -642,9 +643,9 @@
             card.classList.add('albert-deal-located');
             card.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
             setTimeout(()=>card.classList.remove('albert-deal-located'),8500);
-          } else showStatus('Deal #'+item.dealId+' ist in dieser Ansicht nicht verfügbar.',true);
+          } else showStatus('Deal #'+targetDealId+' ist in dieser Ansicht nicht verfügbar.',true);
         });
-        else button.addEventListener('click',()=>{showCompletedResultDetails(item);});
+        else button.addEventListener('click',()=>{button.focus();});
         list.append(button);
       });
     }
@@ -665,7 +666,7 @@
       });
     }
     function recordCompletedResult(id,label,message,state) {
-      const match=/^(?:deep|oracle)-(\\d+)$/.exec(id);
+      const match=/^(?:deep|oracle)-(\d+)$/.exec(id);
       const result={id,label,message,state,dealId:match?match[1]:null,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})};
       completedResults.unshift(result);
       completedResults.splice(8);
