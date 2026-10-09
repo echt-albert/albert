@@ -204,6 +204,9 @@
     </header>
 
 
+    <div id="albert-activity" class="hidden sticky top-[78px] z-20 mx-4 md:mx-8 mt-3 rounded-xl border border-cyan-200 bg-cyan-50/95 backdrop-blur shadow-md px-4 py-3 text-xs" role="status" aria-live="polite">
+      <div class="flex items-center gap-3"><span id="albert-activity-spinner" class="albert-spinner"></span><div class="min-w-0 flex-1"><div class="font-semibold text-slate-900">⚡ Albert arbeitet <span id="albert-activity-count" class="text-slate-500 font-normal"></span></div><div id="albert-activity-message" class="text-cyan-900 mt-1 break-words"></div></div></div>
+    </div>
     <!-- ===================================================== -->
     <!-- FEED + ALBERT -->
     <!-- ===================================================== -->
@@ -535,9 +538,34 @@
     // DEAL BEWERTEN
     // =======================================================
 
+    const activeTasks = new Map();
+    function renderAlbertActivity() {
+      const bar = document.getElementById('albert-activity');
+      const tasks = [...activeTasks.values()];
+      if (!tasks.length) { bar.classList.add('hidden'); return; }
+      bar.classList.remove('hidden');
+      document.getElementById('albert-activity-count').textContent = tasks.length > 1 ? '· ' + tasks.length + ' Vorgänge' : '';
+      document.getElementById('albert-activity-message').textContent = tasks.map(t => t.label + ': ' + t.message).join('  ·  ');
+    }
+    function setAlbertActivity(key, label, message) {
+      activeTasks.set(String(key), {label, message});
+      renderAlbertActivity();
+    }
+    function finishAlbertActivity(key, label, message, failed = false) {
+      activeTasks.delete(String(key));
+      renderAlbertActivity();
+      if (!activeTasks.size) {
+        const bar = document.getElementById('albert-activity');
+        bar.classList.remove('hidden');
+        document.getElementById('albert-activity-count').textContent = '';
+        document.getElementById('albert-activity-message').textContent = (failed ? '⚠ ' : '✓ ') + label + ': ' + message;
+        setTimeout(() => { if (!activeTasks.size) bar.classList.add('hidden'); }, 12000);
+      }
+    }
     const activeMarketResearch = new Map();
     function updateMarketResearch(dealId, message) {
       activeMarketResearch.set(String(dealId), message);
+      setAlbertActivity("deep-" + dealId, "Deep Dive", message);
       const el = document.getElementById('market-progress-' + dealId);
       if (el) el.innerHTML = '<span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(message) + '</span>';
     }
@@ -594,6 +622,7 @@
         if (feedbackError) throw feedbackError;
         if (action === 'DEEP_DIVE') {
           activeMarketResearch.set(String(dealId), 'ORACLE recherchiert deutsche Marktangebote …');
+          setAlbertActivity('deep-' + dealId, deal.product_name || 'Deep Dive', 'ORACLE recherchiert deutsche Marktangebote …');
           activeDealView = 'DEEP_DIVE';
           await fetchDeals();
           showStatus('Deep Dive Market läuft – bitte warten …', false);
@@ -613,8 +642,10 @@
               .update({market_deep_dive:researchData.report}).eq('id',dealId);
             if(saveError) throw saveError;
             showStatus('Deep Dive abgeschlossen: Recherchehinweise gespeichert, noch nicht verifiziert.',false);
+            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert (nicht verifiziert).');
           } catch(researchError) {
             showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
+            finishAlbertActivity('deep-' + dealId, 'Deep Dive', researchError.message, true);
           } finally {
             clearInterval(progressTimer);
             activeMarketResearch.delete(String(dealId));
@@ -1458,15 +1489,18 @@
 
     window.triggerManualHunt = async function() {
       showStatus('RADAR startet Hintergrundrecherche …', false);
+      setAlbertActivity('hunt', 'Sofort-Jagd', 'RADAR startet Hintergrundrecherche …');
       try {
         const data = await runBrainResearch(
           'Finde einen neuen aktuellen B2B-Warenposten.',
-          message => showStatus(message, false)
+          message => { showStatus(message, false); setAlbertActivity('hunt', 'Sofort-Jagd', message); }
         );
+        finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen.');
         activeDealView = 'SOFORT';
         showStatus('Sofort-Jagd abgeschlossen · Ergebnisse unter ⚡ Sofort-Jagd.', false);
         setTimeout(fetchDeals, 1500);
       } catch (err) {
+        finishAlbertActivity('hunt', 'Sofort-Jagd', err.message, true);
         showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
       }
     };
