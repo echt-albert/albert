@@ -1076,8 +1076,10 @@
       const grades = ['A', 'B', 'C', 'X'];
       const gradeCounts = new Map(grades.map(grade => [grade, categoryDeals.filter(deal => dealGrade(deal) === grade).length]));
       const gradeButton = (label, count, selected, value) => {
-        const tones = { A: 'border-emerald-200 bg-emerald-50 text-emerald-800', B: 'border-cyan-200 bg-cyan-50 text-cyan-800', C: 'border-amber-200 bg-amber-50 text-amber-800', X: 'border-rose-200 bg-rose-50 text-rose-800' };
-        const tone = selected ? (tones[value] || 'border-slate-300 bg-slate-100 text-slate-900') : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50';
+        const tones = { A: 'border-emerald-700 bg-emerald-600 hover:bg-emerald-700', B: 'border-cyan-700 bg-cyan-600 hover:bg-cyan-700', C: 'border-amber-700 bg-amber-600 hover:bg-amber-700', X: 'border-rose-700 bg-rose-600 hover:bg-rose-700' };
+        const tone = value === '__ALL__'
+          ? (selected ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+          : tones[value] + ' text-white' + (selected ? ' ring-2 ring-offset-1 ring-slate-400' : ' opacity-85 hover:opacity-100');
         return '<button type="button" data-grade="' + value + '" aria-pressed="' + selected + '" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] leading-tight transition-colors ' + tone + (selected ? ' font-semibold ring-1 ring-current/20' : '') + '"><span>' + label + '</span><span class="font-mono text-[10px] opacity-70">' + count + '</span></button>';
       };
       document.getElementById('grade-filters').innerHTML =
