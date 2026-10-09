@@ -720,8 +720,23 @@
     });
 
     function categoryName(deal) {
-      const name = typeof deal.category === 'string' ? deal.category.trim() : '';
-      return name || 'Ohne Kategorie';
+      const raw = [deal.category, deal.product_name].filter(v => typeof v === 'string' && v.trim()).join(' ');
+      if (!raw) return 'Sonstiges / Unklar';
+      const text = raw.toLocaleLowerCase('de-DE').normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '');
+      const has = re => re.test(text);
+      // Specific products take precedence over broad supplier labels.
+      if (has(/haarglatt|haartrock|fon\\b|f[oö]hn|rasier|epilier|zahnburst|kosmetik|beauty|korperpflege|pflegegerat|wellness/)) return 'Beauty & Körperpflege';
+      if (has(/baby|kleinkind|kinderwagen|wickel|spielzeug|lego|puzzle|gesellschaftsspiel/)) return 'Baby, Kind & Spielzeug';
+      if (has(/sport|fitness|training|outdoor|camping|fahrrad|freizeit|bekleidung|schuh|textil|jacke|mode/)) return 'Sport, Mode & Freizeit';
+      if (has(/garten|pflanz|werkzeug|baumarkt|heimwerk|renovier|sanitar|bauzubehor/)) return 'Garten & Heimwerken';
+      if (has(/buromaterial|burobedarf|schreibwaren|ordner|papier|druckerzubehor|toner|tinte/)) return 'Büro & Schreibwaren';
+      if (has(/tierbedarf|haustier|hund|katze|aquarium/)) return 'Tierbedarf';
+      if (has(/\\bauto\\b|kfz|fahrzeug|motorrad|reifen/)) return 'Auto & Mobilität';
+      if (has(/mobel|einrichtung|wohnen|dekoration|leuchten|lampen|bett|matratze|heimtextil/)) return 'Wohnen & Einrichtung';
+      if (has(/computer|smartphone|telefon|tablet|notebook|laptop|gaming|audio|fernseher|unterhaltungselektronik|it.zubehor/)) return 'Elektronik & IT';
+      if (has(/lebensmittel|nahrung|getrank|susswaren|drogerie|waschmittel|reiniger|hygiene/)) return 'Lebensmittel & Drogerie';
+      if (has(/kuche|kuchen|haushalt|wasserkocher|kaffee|fritteuse|airfryer|mixer|toaster|staubsauger|bugel|reinigung|waschmaschine|geschirrspuler|elektro.kleingerat|kleinelektro|elektrogerat/)) return 'Haushalt & Küchengeräte';
+      return 'Sonstiges / Unklar';
     }
     document.getElementById('category-filters').addEventListener('click', event => {
       const button = event.target.closest('button[data-category]');
