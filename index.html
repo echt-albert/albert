@@ -122,14 +122,8 @@
         </button>
       </nav>
       <div class="mt-8 border-t border-slate-100 pt-4">
-        <div class="text-[10px] uppercase tracking-widest font-mono text-slate-400 mb-2">Albert · Five Brains</div>
-        <div class="flex flex-wrap gap-1.5 text-[10px] font-mono text-slate-500" aria-label="Albert-Brains – Architekturübersicht">
-          <span class="rounded-md bg-slate-50 px-2 py-1">RADAR</span>
-          <span class="rounded-md bg-slate-50 px-2 py-1">CIPHER</span>
-          <span class="rounded-md bg-slate-50 px-2 py-1">ORACLE</span>
-          <span class="rounded-md bg-slate-50 px-2 py-1">QUANTUM</span>
-          <span class="rounded-md bg-slate-50 px-2 py-1">VERDICT</span>
-        </div>
+        <div class="text-[10px] uppercase tracking-widest font-mono text-slate-400 mb-2">Gefundene Kategorien</div>
+        <div id="category-filters" class="flex flex-wrap gap-1.5 text-[10px] font-mono" aria-label="Deals nach Kategorie filtern"></div>
       </div>
 
     </div>
@@ -715,11 +709,24 @@
 
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
     let activeDealView = 'INBOX';
+    let activeCategoryFilter = null;
     const dealViewNames = { INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
       activeDealView = button.dataset.view;
+      activeCategoryFilter = null;
+      fetchDeals();
+    });
+
+    function categoryName(deal) {
+      const name = typeof deal.category === 'string' ? deal.category.trim() : '';
+      return name || 'Ohne Kategorie';
+    }
+    document.getElementById('category-filters').addEventListener('click', event => {
+      const button = event.target.closest('button[data-category]');
+      if (!button) return;
+      activeCategoryFilter = button.dataset.category === '__ALL__' ? null : button.dataset.category;
       fetchDeals();
     });
 
@@ -794,7 +801,23 @@
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const visibleDeals = (deals || []).filter(deal => dealFolder(deal) === activeDealView);
+      const folderDeals = (deals || []).filter(deal => dealFolder(deal) === activeDealView);
+      const categoryCounts = new Map();
+      for (const deal of folderDeals) {
+        const name = categoryName(deal);
+        categoryCounts.set(name, (categoryCounts.get(name) || 0) + 1);
+      }
+      if (activeCategoryFilter && !categoryCounts.has(activeCategoryFilter)) activeCategoryFilter = null;
+      const categoryButton = (name, count, selected, value) =>
+        '<button type="button" data-category="' + escapeHtml(value) + '" aria-pressed="' + selected +
+        '" class="rounded-md border px-2 py-1 transition-colors ' +
+        (selected ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100') +
+        '">' + escapeHtml(name) + ' <span class="opacity-70">' + count + '</span></button>';
+      document.getElementById('category-filters').innerHTML =
+        categoryButton('Alle', folderDeals.length, !activeCategoryFilter, '__ALL__') +
+        [...categoryCounts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'de'))
+          .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
+      const visibleDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
 
