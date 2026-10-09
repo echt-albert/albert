@@ -542,10 +542,10 @@
         if (feedbackError) throw feedbackError;
         if (action === 'DEEP_DIVE') {
           await fetchDeals();
-          showStatus('Deep Dive Market: unabhängige Suchquellen werden abgefragt …', false);
+          showStatus('Deep Dive Market: Gemini recherchiert deutsche Marktquellen …', false);
           try {
-            const researchResponse = await fetch('/api/deep-dive', {
-              method:'POST', headers:{'Content-Type':'application/json'},
+            const researchResponse = await fetch(SUPABASE_URL + '/functions/v1/albert-market', {
+              method:'POST', headers:{'Content-Type':'application/json', 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY},
               body:JSON.stringify({product:deal})
             });
             const researchData = await researchResponse.json();
