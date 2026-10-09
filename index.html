@@ -720,6 +720,8 @@
     });
 
     function categoryName(deal) {
+      const confirmed = categoryLabels.get(String(deal.id));
+      if (confirmed) return confirmed;
       const raw = [deal.product_name, deal.category].filter(v => typeof v === 'string' && v.trim()).join(' ');
       if (!raw) return 'Sonstiges';
       const t = raw.toLocaleLowerCase('de-DE').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -731,6 +733,24 @@
       if (has(/computer|smartphone|telefon|tablet|notebook|laptop|gaming|audio|fernseher|unterhaltungselektronik|it.zubehor|kfz|fahrzeug|motorrad|reifen/)) return 'Technik & Elektronik';
       if (has(/kuche|kuchen|haushalt|wasserkocher|kaffee|fritteuse|airfryer|mixer|toaster|staubsauger|bugel|reinigung|waschmaschine|geschirrspuler|elektro.kleingerat|kleinelektro|elektrogerat|mobel|einrichtung|wohnen|dekoration|leuchten|lampen|bett|matratze|heimtextil|garten|pflanz|werkzeug|baumarkt|heimwerk|renovier|sanitar|bauzubehor/)) return 'Haushalt & Wohnen';
       return 'Sonstiges';
+    }
+    let categoryLabels = new Map();
+    let knownCategories = new Set();
+    async function saveDealCategory(dealId) {
+      const input = document.getElementById('category-input-' + dealId);
+      if (!input) return;
+      const category = input.value.trim().replace(/\s+/g, ' ');
+      if (category.length < 2 || category.length > 60) return alert('Kategorie: 2 bis 60 Zeichen.');
+      const deal = window.albertDealsById?.get(String(dealId));
+      if (!deal) return;
+      const { error } = await supabaseClient.from('deal_category_labels').upsert({
+        discovery_id: dealId, category, original_category: deal.category || null,
+        product_name: deal.product_name || null, updated_at: new Date().toISOString()
+      }, { onConflict: 'discovery_id' });
+      if (error) return alert('Speichern fehlgeschlagen: ' + error.message);
+      categoryLabels.set(String(dealId), category);
+      knownCategories.add(category);
+      fetchDeals();
     }
     document.getElementById('category-filters').addEventListener('click', event => {
       const button = event.target.closest('button[data-category]');
@@ -787,6 +807,13 @@
 
       }
 
+      window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
+      const { data: savedCategories, error: categoryError } = await supabaseClient
+        .from('deal_category_labels').select('discovery_id,category');
+      if (!categoryError) {
+        categoryLabels = new Map((savedCategories || []).map(row => [String(row.discovery_id), row.category]));
+        for (const row of savedCategories || []) knownCategories.add(row.category);
+      }
       const { data: feedbackRows, error: feedbackReadError } = await supabaseClient
         .from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id', { ascending: false });
       if (feedbackReadError) {
@@ -829,6 +856,10 @@
         categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
         [...categoryCounts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'de'))
           .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
+      const categoryOptions = [...new Set([...knownCategories, ...categoryCounts.keys()])]
+        .sort((a,b) => a.localeCompare(b,'de'));
+      const categorySuggestions = '<datalist id="albert-category-suggestions">' +
+        categoryOptions.map(name => '<option value="' + escapeHtml(name) + '"></option>').join('') + '</datalist>';
       const visibleDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
@@ -842,7 +873,7 @@
       }
 
 
-      container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
+      container.innerHTML = categorySuggestions + viewHeading + visibleDeals.map((deal, index) => {
 
         const progressMessage = activeMarketResearch.get(String(deal.id));
         const progressBanner = progressMessage ? '<div id="market-progress-' + escapeHtml(String(deal.id)) + '" class="albert-working" role="status" aria-live="polite"><span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(progressMessage) + '</span></div>' : '';
@@ -944,9 +975,16 @@
                 <div class="flex flex-wrap items-center gap-2 mb-1.5">
 
                   <span class="text-[10px] font-medium uppercase tracking-wider text-cyan-700 mono bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">
-                    ${escapeHtml(deal.category || 'Allgemein')}
+                    ${escapeHtml(categoryName(deal))}
                   </span>
-
+                  <details class="relative text-[11px]">
+                    <summary class="cursor-pointer list-none text-slate-500 hover:text-amber-800 px-1.5 py-0.5" title="Kategorie ändern">✎ Kategorie</summary>
+                    <div class="absolute z-30 top-7 left-0 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl" onclick="event.stopPropagation()">
+                      <label class="block text-[10px] uppercase tracking-wide text-slate-500 mb-2">Wählen oder neu eingeben</label>
+                      <input id="category-input-${dealId}" list="albert-category-suggestions" value="${escapeHtml(categoryName(deal))}" maxlength="60" class="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:border-amber-400" />
+                      <button type="button" onclick="saveDealCategory('${dealId}')" class="mt-2 w-full rounded-lg bg-amber-50 border border-amber-200 text-amber-900 py-2 font-semibold hover:bg-amber-100">Speichern</button>
+                    </div>
+                  </details>
                   <span class="text-[10px] font-medium uppercase tracking-wider mono px-2 py-0.5 rounded border ${deal.hunt_origin === 'SOFORT' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-100 border-slate-200'}">
                     ${deal.hunt_origin === 'SOFORT' ? '⚡ Sofort-Jagd' : '↻ Permanente Jagd'}
                   </span>
