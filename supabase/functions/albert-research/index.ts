@@ -41,32 +41,22 @@ serve(async (req) => {
       console.log("Research Run ID erstellt:", runId);
     }
 
+    const { query } = await req.json().catch(() => ({ query: "" }));
+    const requestedQuery = typeof query === "string" ? query.trim().slice(0, 600) : "";
     const ai = new GoogleGenAI({ apiKey });
 
     console.log("2. Rufe Gemini mit Google Search Grounding auf...");
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
-      contents: `Finde einen aktuellen B2B-Sonderposten oder Restposten im Netz. 
-      Recherchiere parallel genau 3 unterschiedliche B2C-Marktpreise (Referenzpreise aus verschiedenen deutschen Online-Shops) für dieses Produkt.
-      Ermittle außerdem wenn möglich die Marke (brand), EAN/GTIN und MPN (Herstellerartikelnummer).
-      Bewerte die Wirtschaftlichkeit und vergibe eine Note (A = Top-Nachfrage, B = Solide, C = Knapp, X = Unrentabel).
-      Ordne das Produkt einer präzisen B2B-Kategorie zu.
-      
-      Antworte AUSSCHLIESSLICH im Format eines JSON-Strings mit exakt diesen Feldern:
-      {
-        "product_name": "Genauer Titel des Produkts",
-        "brand": "Markenname oder null",
-        "ean_gtin": "EAN/GTIN oder null",
-        "mpn": "MPN oder null",
-        "purchase_price": 0.00,
-        "currency": "EUR",
-        "quantity": 100,
-        "offer_url": "https://www.restposten.de/...",
-        "market_prices": [0.00, 0.00, 0.00],
-        "decision_grade": "A",
-        "decision_reason": "Kurze Begründung...",
-        "category": "Küche"
-      }`,
+      contents: `Du bist ausschließlich RADAR, die Beschaffungsdivision. Suche einen realen, aktuell verfügbaren B2B-Restposten in Europa für B2C-Verkauf in Deutschland.
+      Auftrag: ${requestedQuery || "Finde einen neuen aktuellen B2B-Warenposten."}
+      Verwende Google Search. Nenne nur nachweisbare Fakten. Keine erfundenen Preise, Mengen, EANs, URLs oder Nachfrage.
+      Produktidentifikation, Marktverifikation, Wirtschaftlichkeitsrechnung und Kaufentscheidung erfolgen später durch CIPHER, ORACLE, QUANTUM und VERDICT.
+      Marktpreise dürfen als unverifizierte Recherchehinweise mitgeliefert werden, aber keine Bewertung.
+      Antworte ausschließlich mit einem JSON-Objekt mit diesen Feldern:
+      {"product_name":null,"brand":null,"ean_gtin":null,"mpn":null,"purchase_price":null,"currency":"EUR","quantity":null,"offer_url":null,"market_prices":[],"category":null}
+      Setze unbekannte Werte auf null, market_prices andernfalls auf [].
+      Der offer_url muss auf das konkrete Angebot zeigen, nicht auf eine Portalstartseite.`,
       config: {
         tools: [{ googleSearch: {} }],
       },
@@ -91,15 +81,14 @@ serve(async (req) => {
         purchase_price: null,
         currency: "EUR",
         quantity: null,
-        offer_url: "https://www.restposten.de",
+        offer_url: null,
         market_prices: [],
-        decision_grade: "X",
-        decision_reason: "Konnte JSON nicht sauber parsen.",
         category: "Allgemein"
       };
     }
 
-    const targetUrl = dealData?.offer_url || "https://www.restposten.de";
+    const targetUrl = typeof dealData?.offer_url === "string" ? dealData.offer_url.trim() : "";
+    if (!/^https:\/\/[^\s/]+\/\S+/i.test(targetUrl)) throw new Error("RADAR: Konkrete Angebots-URL fehlt.");
 
     console.log("4. Prüfe URL auf Erreichbarkeit:", targetUrl);
     const isAlive = await checkUrl(targetUrl);
@@ -152,8 +141,8 @@ serve(async (req) => {
           offer_url: targetUrl,
           category: dealData?.category || "Allgemein",
           market_prices: dealData?.market_prices || [],
-          decision_grade: dealData?.decision_grade || "A",
-          decision_reason: dealData?.decision_reason || "",
+          decision_grade: "B",
+          decision_reason: "RADAR-Fund: Produktidentität, deutscher Markt, Nachfrage und Vollkosten müssen durch die Spezialdivisionen geprüft werden.",
           bucket: "DIVE",
           research_run_id: runId,
           discovered_at: new Date().toISOString()
