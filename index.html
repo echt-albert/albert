@@ -650,57 +650,38 @@
     // =======================================================
 
     async function rateDeal(dealId, action) {
-
-      showStatus(
-        `Verarbeite Aktion '${action}' für Deal ID #${dealId}...`,
-        false
-      );
-
+      if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
+      const comment = window.prompt('Deine Einschätzung zu diesem Posten (optional):', '');
+      if (comment === null) return;
+      showStatus('Speichere Feedback und starte VERDICT …', false);
       try {
-
-        let newGrade = 'B';
-
-        if (action === 'REJECT') {
-          newGrade = 'F';
+        const { data: deal, error: readError } = await supabaseClient
+          .from('discoveries').select('*').eq('id', dealId).single();
+        if (readError || !deal) throw new Error(readError?.message || 'Posten nicht gefunden.');
+        const feedback = { action, comment: comment.trim().slice(0, 1500) || null };
+        const { error: feedbackError } = await supabaseClient.from('deal_feedback')
+          .insert({ discovery_id: dealId, ...feedback });
+        if (feedbackError) throw feedbackError;
+        if (!deal.brain_analysis) {
+          showStatus('Feedback gespeichert. Für diesen älteren Posten fehlt die Analyse vor VERDICT.', false);
+          return;
         }
-
-        if (action === 'WATCH') {
-          newGrade = 'W';
-        }
-
-        if (action === 'DEEP_DIVE') {
-          newGrade = 'A';
-        }
-
-        if (action === 'LEARN') {
-          newGrade = 'L';
-        }
-
-        const { error } = await supabaseClient
-          .from('discoveries')
-          .update({
-            decision_grade: newGrade
-          })
-          .eq('id', dealId);
-
-        if (error) throw error;
-
-        showStatus(
-          `Deal erfolgreich eingestuft als [${action}] (Grade: ${newGrade})`,
-          false
-        );
-
-        setTimeout(fetchDeals, 1200);
-
+        const response = await fetch('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'human_verdict', messages: [{ role: 'user', content: 'Bewerte menschliches Feedback' }], feedback,
+            analysis: deal.brain_analysis, product: deal })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'VERDICT fehlgeschlagen.');
+        const { error: updateError } = await supabaseClient.from('discoveries')
+          .update({ human_verdict: result.verdict }).eq('id', dealId);
+        if (updateError) throw updateError;
+        showStatus('Feedback gespeichert · VERDICT: ' + result.verdict.verdict_grade +
+          ' · Empfehlung: ' + result.verdict.verdict_recommendation, false);
+        setTimeout(fetchDeals, 700);
       } catch (err) {
-
-        showStatus(
-          'Fehler beim Bewerten: ' + err.message,
-          true
-        );
-
+        showStatus('Fehler beim Bewerten: ' + err.message, true);
       }
-
     }
 
 
@@ -1274,7 +1255,7 @@
                 </h3>
 
                 <p class="text-slate-600 leading-relaxed whitespace-pre-wrap">
-                  ${escapeHtml(deal.decision_reason || 'Keine detaillierte Begründung hinterlegt.')}
+                  ${escapeHtml(deal.human_verdict ? ('VERDICT: ' + deal.human_verdict.verdict_grade + ' / ' + deal.human_verdict.verdict_recommendation) : 'VERDICT wartet auf Feedback')}
                 </p>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/60 font-mono text-[11px]">
@@ -1408,7 +1389,7 @@
       if (!research) throw new Error('Recherche dauert zu lange; Job-ID: ' + jobId);
       const product = research.saved_deal || research.deal;
       if (!product) throw new Error('RADAR hat keinen neuen prüfbaren Posten geliefert (' + (research.status || 'kein Ergebnis') + ').');
-      onProgress('RADAR abgeschlossen · CIPHER → ORACLE → QUANTUM → VERDICT …');
+      onProgress('RADAR abgeschlossen · CIPHER → ORACLE → QUANTUM …');
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1417,6 +1398,12 @@
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Brain-Auswertung fehlgeschlagen.');
+      const analysis = data.pipeline?.results;
+      if (product.id && analysis) {
+        const { error: saveError } = await supabaseClient.from('discoveries')
+          .update({ brain_analysis: analysis }).eq('id', product.id);
+        if (saveError) throw new Error('Analyse konnte nicht gespeichert werden: ' + saveError.message);
+      }
       return data;
     }
 
@@ -1427,10 +1414,7 @@
           'Finde einen neuen aktuellen B2B-Warenposten.',
           message => showStatus(message, false)
         );
-        const verdict = data.pipeline?.results?.VERDICT;
-        showStatus('Fünf Brains abgeschlossen · VERDICT: ' +
-          (verdict?.verdict_grade || 'B') +
-          ' · Vorläufig: Markt und Nachfrage noch nicht unabhängig verifiziert.', false);
+        showStatus('Vier Brains abgeschlossen · Bitte im Feed bewerten. VERDICT wartet auf dein Feedback.', false);
         setTimeout(fetchDeals, 1500);
       } catch (err) {
         showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
