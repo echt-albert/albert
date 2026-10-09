@@ -565,6 +565,53 @@
       if (activeTasks.size) { renderAlbertActivity(); return; }
       showPulseNotice(failed ? 'MISSION NICHT ABGESCHLOSSEN' : incomplete ? 'WEITERE DATEN BENÖTIGT' : 'MISSION ABGESCHLOSSEN ✓', label + ': ' + message, failed ? 'error' : incomplete ? 'warning' : 'success');
     }
+    const deepDiveLastRun = new Map();
+    const deepDiveStatusKey = id => 'albert-deep-dive-status-' + String(id);
+    function rememberDeepDive(id, state, message) {
+      const record = {state, message, at: new Date().toISOString()};
+      deepDiveLastRun.set(String(id), record);
+      try { localStorage.setItem(deepDiveStatusKey(id), JSON.stringify(record)); } catch (_) {}
+    }
+    function deepDiveStatus(deal) {
+      const id = String(deal.id);
+      if (activeMarketResearch.has(id)) return {label:'Deep Dive läuft', color:'border-cyan-200 bg-cyan-50 text-cyan-800', detail:'Recherche läuft'};
+      let record = deepDiveLastRun.get(id);
+      if (!record) { try { record = JSON.parse(localStorage.getItem(deepDiveStatusKey(id)) || 'null'); } catch (_) {} }
+      const hasReport = !!deal.market_deep_dive;
+      const verified = deal.market_deep_dive?.verified_lowest_total_price != null;
+      // Alte lokale Fehler dürfen eine später gespeicherte Marktanalyse nicht verdecken.
+      if (record?.state === 'error' && !hasReport) return {label:'Recherchefehler', color:'border-rose-200 bg-rose-50 text-rose-800', detail:record.message};
+      if (verified) return {label:'Markt geprüft', color:'border-emerald-200 bg-emerald-50 text-emerald-800', detail:'Verifizierter Preis hinterlegt'};
+      if (hasReport) return {label:'Prüfung offen', color:'border-amber-200 bg-amber-50 text-amber-800', detail:'Markthinweise vorhanden; Verifizierung offen'};
+      return {label:'Nicht geprüft', color:'border-slate-200 bg-slate-50 text-slate-500', detail:'Noch kein Deep Dive gespeichert'};
+    }
+    function showDeepDiveResult(deal, state, message) {
+      const modal = document.getElementById('albert-deep-dive-result');
+      if (!modal) return;
+      const name = deal?.product_name || 'Deal';
+      const error = state === 'error', verified = state === 'verified';
+      const heading = error ? 'DEEP DIVE FEHLGESCHLAGEN' : verified ? 'MARKT GEPRÜFT' : 'WEITERE PRÜFUNG NÖTIG';
+      const style = error ? 'text-rose-700 bg-rose-50' : verified ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50';
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+      modal.innerHTML = '<div class="absolute inset-0 bg-slate-900/50" data-result-close="true"></div>' +
+        '<section role="dialog" aria-modal="true" aria-labelledby="deep-result-title" class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">' +
+        '<div class="rounded-xl px-4 py-3 font-semibold text-sm ' + style + '" id="deep-result-title">' + heading + '</div>' +
+        '<p class="mt-4 text-sm font-medium text-slate-900">' + escapeHtml(name) + '</p>' +
+        '<p class="mt-2 text-sm text-slate-600">' + escapeHtml(message) + '</p>' +
+        '<p class="mt-2 text-xs text-slate-400">Status: ' + new Date().toLocaleString('de-DE') + '</p>' +
+        '<button type="button" data-result-close="true" class="mt-5 w-full rounded-lg bg-slate-900 px-4 py-2.5 text-white text-sm">' + (error ? 'Schließen und erneut versuchen' : 'Deal ansehen') + '</button></section>';
+      const close = event => {
+        if (event && !event.target.closest('[data-result-close]')) return;
+        modal.classList.add('hidden'); modal.classList.remove('flex'); modal.innerHTML = '';
+        modal.removeEventListener('click', close); document.removeEventListener('keydown', keyClose);
+        if (!error) {
+          const card = document.getElementById('deal-card-' + deal.id);
+          if (card) card.scrollIntoView({behavior:'smooth',block:'start'});
+        }
+      };
+      const keyClose = event => { if (event.key === 'Escape') close({target:modal.querySelector('[data-result-close]')}); };
+      modal.addEventListener('click', close); document.addEventListener('keydown', keyClose);
+    }
     const activeMarketResearch = new Map();
     function updateMarketResearch(dealId, message) {
       activeMarketResearch.set(String(dealId), message);
@@ -660,9 +707,14 @@
             const {error:saveError}=await supabaseClient.from('discoveries')
               .update({market_deep_dive:researchData.report}).eq('id',dealId);
             if(saveError) throw saveError;
-            showStatus('Deep Dive abgeschlossen: Recherchehinweise gespeichert, noch nicht verifiziert.',false);
-            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert, noch nicht verifiziert.', false, true);
+            const verified = researchData.report?.verified_lowest_total_price != null;
+            rememberDeepDive(dealId, verified ? 'verified' : 'incomplete', verified ? 'Verifizierter Gesamtmarktpreis hinterlegt.' : 'Markthinweise gespeichert, aber noch nicht abschließend verifiziert.');
+            showStatus(verified ? 'Deep Dive abgeschlossen: Marktpreis verifiziert.' : 'Deep Dive abgeschlossen: Weitere Prüfung nötig.',false);
+            finishAlbertActivity('deep-' + dealId, 'Deep Dive', verified ? 'Marktpreis verifiziert.' : 'Markthinweise gespeichert, Verifizierung offen.', false, !verified);
+            showDeepDiveResult(deal, verified ? 'verified' : 'incomplete', verified ? 'Ein verifizierter Gesamtmarktpreis wurde gespeichert.' : 'Die Recherche wurde gespeichert. Marktpreise und Produktidentität müssen noch geprüft werden.');
           } catch(researchError) {
+            rememberDeepDive(dealId, 'error', researchError.message);
+            showDeepDiveResult(deal, 'error', 'Die Recherche konnte nicht abgeschlossen werden: ' + researchError.message);
             showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
             finishAlbertActivity('deep-' + dealId, 'Deep Dive', researchError.message, true);
           } finally {
@@ -1180,6 +1232,7 @@
         const expanded = isDealExpanded(deal.id, activeDealView);
         const compact = !expanded;
         const grade = escapeHtml(deal.human_verdict?.verdict_grade || deal.decision_grade || '—');
+        const deepStatus = deepDiveStatus(deal);
         const latestFeedback = (feedbackRows || []).find(row => String(row.discovery_id) === String(deal.id));
         const currentAction = dealFolder(deal);
         const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',SOFORT:'Neu',INBOX:'Neu'}[currentAction];
@@ -1210,6 +1263,7 @@
             <!-- DEAL HEADER -->
 
             <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
+              <div class="w-full flex justify-end"><span title="${escapeHtml(deepStatus.detail)}" class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${deepStatus.color}">${escapeHtml(deepStatus.label)}</span></div>
 
               <div class="min-w-0">
 
@@ -1859,5 +1913,6 @@
   </script>
 
     <div id="albert-decision-modal" class="fixed inset-0 z-[110] hidden items-center justify-center p-4" aria-live="polite"></div>
+    <div id="albert-deep-dive-result" class="fixed inset-0 z-[120] hidden items-center justify-center p-4"></div>
 </body>
 </html>
