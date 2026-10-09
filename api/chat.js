@@ -662,6 +662,21 @@ module.exports = async function handler(req, res) {
   const query = lastUserMessage?.content?.trim() || "";
   // Deterministic routing: research requests execute real divisions, not a text-only LLM.
   const researchIntent = /\b(recherchier\w*|such\w*|find\w*|jagd|sofort.jagd|restposten|warenposten|sonderposten|bezugsquellen|neue deals|neue posten|beschaff\w*|sourcing)\b/i.test(query);
+  if (mode === "human_verdict") {
+    const { feedback, analysis, product } = req.body || {};
+    if (!feedback || !["WATCH", "DEEP_DIVE", "LEARN", "REJECT"].includes(feedback.action)
+        || !analysis || typeof analysis !== "object" || !product || typeof product !== "object") {
+      return res.status(400).json({ error: "Analyse und menschliches Feedback fehlen." });
+    }
+    try {
+      const verdictInput = { product, ...analysis.CIPHER, ...analysis.ORACLE,
+        ...analysis.QUANTUM, humanFeedback: feedback };
+      const verdict = await Albert.executeDivision("VERDICT", verdictInput);
+      return res.status(200).json({ success: true, verdict });
+    } catch (error) {
+      return res.status(500).json({ error: "VERDICT konnte nicht ausgeführt werden." });
+    }
+  }
   if (mode === "pipeline" || (mode !== "chat_only" && researchIntent)) {
     if (!query) return res.status(400).json({ error: "Rechercheauftrag fehlt." });
     try {
@@ -678,7 +693,7 @@ module.exports = async function handler(req, res) {
       const radarStatus = pipeline.results.RADAR?.radar_status || "COMPLETED";
       const message = product
         ? [product.product_name || "Warenposten",
-           "Bewertung: " + (verdict.verdict_grade || "B"),
+           "Status: " + (pipeline.status === "AWAITING_HUMAN" ? "WARTET AUF MENSCH" : (verdict.verdict_grade || "B")),
            verdict.verdict_message || "Weitere Prüfung erforderlich.",
            "Marktpreise und Nachfrage sind noch nicht unabhängig verifiziert."].join(" · ")
         : "Recherche beendet (" + radarStatus + "). Kein neuer prüfbarer Warenposten vorhanden.";
