@@ -14,7 +14,7 @@ const Albert = require("../core/albert");
 
 // Supabase Grounded Search typically takes 25–40 seconds.
 // Allow the full pipeline to finish within Vercel Fluid Compute limits.
-module.exports.config = { maxDuration: 60 };
+
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
@@ -798,3 +798,5 @@ module.exports = async function handler(req, res) {
   }
 
 };
+
+module.exports.config = { maxDuration: 60 };
