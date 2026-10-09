@@ -36,11 +36,12 @@
       align-items: start;
     }
 
-    .albert-communicator {
+    .albert-right-rail {
       position: sticky;
       top: 100px;
       min-width: 0;
     }
+    .albert-communicator { min-width: 0; }
 
     /* Fünf Divisionen bleiben auch im schmaleren Feed lesbar */
     .deal-divisions {
@@ -60,7 +61,7 @@
         grid-template-columns: minmax(0, 1fr);
       }
 
-      .albert-communicator {
+      .albert-right-rail {
         position: static;
         grid-row: 1;
       }
@@ -204,9 +205,6 @@
     </header>
 
 
-    <div id="albert-activity" class="hidden sticky top-[78px] z-20 mx-4 md:mx-8 mt-3 rounded-xl border border-cyan-200 bg-cyan-50/95 backdrop-blur shadow-md px-4 py-3 text-xs" role="status" aria-live="polite">
-      <div class="flex items-center gap-3"><span id="albert-activity-spinner" class="albert-spinner"></span><div class="min-w-0 flex-1"><div class="font-semibold text-slate-900">⚡ Albert arbeitet <span id="albert-activity-count" class="text-slate-500 font-normal"></span></div><div id="albert-activity-message" class="text-cyan-900 mt-1 break-words"></div></div></div>
-    </div>
     <!-- ===================================================== -->
     <!-- FEED + ALBERT -->
     <!-- ===================================================== -->
@@ -239,6 +237,7 @@
         <!-- ALBERT COMMUNICATOR -->
         <!-- ================================================= -->
 
+        <div class="albert-right-rail">
         <section class="albert-communicator bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
 
           <!-- KOPF -->
@@ -315,7 +314,12 @@
           </div>
 
         </section>
+    <div id="albert-activity" class="hidden rounded-xl border border-cyan-100 bg-white shadow-sm px-3 py-3 text-xs mt-3" role="status" aria-live="polite">
+      <div class="flex items-center gap-3"><span id="albert-activity-spinner" class="albert-spinner"></span><div class="min-w-0 flex-1"><div class="font-semibold text-slate-900">Albert arbeitet <span id="albert-activity-count" class="text-slate-500 font-normal"></span></div><div id="albert-activity-message" class="text-slate-600 mt-1 break-words leading-relaxed"></div></div></div>
+    </div>
 
+
+        </div>
       </div>
 
     </main>
