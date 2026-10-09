@@ -565,8 +565,6 @@
     function updateMarketResearch(dealId, message) {
       activeMarketResearch.set(String(dealId), message);
       setAlbertActivity("deep-" + dealId, "Deep Dive", message);
-      const el = document.getElementById('market-progress-' + dealId);
-      if (el) el.innerHTML = '<span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(message) + '</span>';
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
@@ -1073,8 +1071,6 @@
 
       container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
-        const progressMessage = activeMarketResearch.get(String(deal.id));
-        const progressBanner = progressMessage ? '<div id="market-progress-' + escapeHtml(String(deal.id)) + '" class="albert-working" role="status" aria-live="polite"><span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(progressMessage) + '</span></div>' : '';
         const rawPrices = Array.isArray(deal.market_prices)
           ? deal.market_prices
           : [];
@@ -1163,7 +1159,6 @@
         return `
 
           <article id="deal-card-${dealId}" data-market-verified="${deal.market_deep_dive?.verified_lowest_total_price != null}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            ${progressBanner}
             <!-- DEAL HEADER -->
 
             <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
