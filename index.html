@@ -847,10 +847,13 @@
       return dealExpansion.get(String(id)) === true;
     }
     const portraitRequests = new Map();
+    const portraitCache = new Map();
     async function loadProductPortrait(id) {
       const key = String(id);
       const target = document.getElementById('product-portrait-' + key);
-      if (!target || portraitRequests.has(key)) return;
+      if (!target) return;
+      if (portraitCache.has(key)) { target.textContent = portraitCache.get(key); return; }
+      if (portraitRequests.has(key)) return;
       portraitRequests.set(key, true);
       target.textContent = 'Albert recherchiert die wichtigsten Merkmale dieses Modells …';
       try {
@@ -861,6 +864,7 @@
         const current = document.getElementById('product-portrait-' + key);
         if (!current) return;
         if (data?.status === 'ready' && data.portrait) {
+          portraitCache.set(key, data.portrait);
           current.textContent = data.portrait;
         } else if (data?.status === 'pending') {
           current.textContent = 'Produktporträt wird recherchiert. Bitte den Deal in Kürze erneut öffnen.';
@@ -871,14 +875,21 @@
         console.warn('Produktporträt nicht verfügbar:', error);
         const current = document.getElementById('product-portrait-' + key);
         if (current) current.textContent = 'Produktporträt momentan nicht abrufbar.';
+      } finally {
         portraitRequests.delete(key);
       }
     }
     const audienceRequests = new Map();
+    const audienceCache = new Map();
     async function loadTargetAudience(id) {
       const key = String(id);
       const target = document.getElementById('target-audience-' + key);
-      if (!target || audienceRequests.has(key)) return;
+      if (!target) return;
+      if (audienceCache.has(key)) {
+        target.replaceChildren(...audienceCache.get(key).map(child => child.cloneNode(true)));
+        return;
+      }
+      if (audienceRequests.has(key)) return;
       audienceRequests.set(key, true);
       target.textContent = 'Albert ermittelt mögliche Käufergruppen …';
       try {
@@ -912,10 +923,12 @@
           'Alter: ' + (data.age_estimate || 'Nicht belastbar eingrenzbar'),
           'Einkommensniveau: ' + (data.income_estimate || 'Einkommensübergreifend')
         ]);
+        audienceCache.set(key, [...node.children].map(child => child.cloneNode(true)));
       } catch(e) {
         console.warn('Zielgruppen nicht abrufbar:',e);
         const node=document.getElementById('target-audience-'+key);
         if(node) node.textContent='Zielgruppenanalyse momentan nicht abrufbar.';
+      } finally {
         audienceRequests.delete(key);
       }
     }
@@ -963,7 +976,6 @@
 
       }
 
-      portraitRequests.clear();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
       const { data: savedCategories, error: categoryError } = await supabaseClient
         .from('deal_category_labels').select('discovery_id,category');
@@ -1653,6 +1665,14 @@
         `;
 
       }).join('');
+
+      // Offene Deal-Kacheln nach jedem Re-Render wiederherstellen.
+      for (const deal of visibleDeals) {
+        if (isDealExpanded(deal.id, activeDealView)) {
+          loadProductPortrait(deal.id);
+          loadTargetAudience(deal.id);
+        }
+      }
 
     }
 
