@@ -21,6 +21,17 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
+
+    /* Deal-Kacheln: konsistente Leseschrift und klare Label-Hierarchie */
+    .deal-divisions > div { font-size: 12px; line-height: 1.55; }
+    .deal-divisions > div p,
+    .deal-divisions > div .deal-body-text { font-size: 12px; line-height: 1.55; }
+    .deal-divisions > div .mono:not([class*="text-"]) { font-size: 11px; }
+    .deal-divisions > div [class*="text-[11px]"]:not(.mono) { font-size: 12px; }
+    .deal-divisions > div [class*="text-[12px]"] { font-size: 12px; }
+    .deal-divisions > div [class*="text-[13px]"] { font-size: 12px; }
+    .deal-divisions > div [class*="text-[14px]"] { font-size: 12px; }
+    .deal-divisions > div [class*="text-[10px]"] { font-size: 10px; }
     @keyframes albert-spin { to { transform: rotate(360deg); } }
     .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
     .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
