@@ -1391,40 +1391,33 @@
     // =======================================================
 
     window.triggerManualHunt = async function() {
-
-      showStatus(
-        'Triggere Sofort-Jagd über Edge Function...',
-        false
-      );
-
+      showStatus('Albert startet RADAR → CIPHER → ORACLE → QUANTUM → VERDICT …', false);
       try {
-
-        const { data, error } =
-          await supabaseClient.functions.invoke(
-            'albert-research',
-            {
-              method: 'POST'
-            }
-          );
-
-        if (error) throw error;
-
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'pipeline',
+            messages: [{ role: 'user', content: 'Finde einen neuen aktuellen B2B-Warenposten.' }]
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Pipeline fehlgeschlagen.');
+        const log = data.pipeline?.executionLog || [];
+        const failed = log.find(step => step.status !== 'completed');
+        if (failed) throw new Error('Brain ' + failed.division + ': ' + (failed.error || 'Fehler'));
+        const verdict = data.pipeline?.results?.VERDICT;
+        const radar = data.pipeline?.results?.RADAR;
         showStatus(
-          'Jagd beendet: ' + JSON.stringify(data),
+          'Fünf Brains abgeschlossen · RADAR: ' + (radar?.radar_status || 'OK') +
+          ' · VERDICT: ' + (verdict?.verdict_grade || 'B') +
+          ' (vorläufig; Markt und Nachfrage nicht unabhängig verifiziert).',
           false
         );
-
         setTimeout(fetchDeals, 1500);
-
       } catch (err) {
-
-        showStatus(
-          'Fehler bei Sofort-Jagd: ' + err.message,
-          true
-        );
-
+        showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
       }
-
     };
 
 
