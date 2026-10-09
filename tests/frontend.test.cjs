@@ -71,7 +71,11 @@ test('deal loading errors are handled', () => {
   assert.match(script, /if \(error\)/);
 });
 test('retry button invokes callback only when clicked', () => {
-  const source = functionSource('showAiRetry', 'loadProductPortrait');
+  // Stop before the next declaration: loadProductPortrait is an async function.
+  const start = script.indexOf('function showAiRetry(');
+  const end = script.indexOf('const portraitRequests', start);
+  assert.ok(start >= 0 && end > start);
+  const source = script.slice(start, end);
   const listeners = [];
   const document = { createElement: tag => ({
     tag, textContent: '', className: '', type: '',
