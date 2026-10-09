@@ -134,7 +134,7 @@
       </nav>
       <div class="mt-8 border-t border-slate-100 pt-4">
         <div class="flex items-center justify-between mb-3"><div class="text-[10px] uppercase tracking-[0.16em] font-mono text-slate-400">Kategorien</div><span class="text-[10px] text-slate-300 font-mono">FILTER</span></div>
-        <div id="category-filters" class="space-y-0.5 max-h-64 overflow-y-auto pr-1" aria-label="Deals nach Kategorie filtern"></div>
+        <div id="category-filters" class="flex flex-wrap content-start items-start gap-1.5 max-h-64 overflow-y-auto pr-1" aria-label="Deals nach Kategorie filtern"></div>
       </div>
 
     </div>
@@ -565,8 +565,6 @@
     function updateMarketResearch(dealId, message) {
       activeMarketResearch.set(String(dealId), message);
       setAlbertActivity("deep-" + dealId, "Deep Dive", message);
-      const el = document.getElementById('market-progress-' + dealId);
-      if (el) el.innerHTML = '<span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(message) + '</span>';
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
@@ -1050,12 +1048,10 @@
       }
       if (activeCategoryFilter && !categoryCounts.has(activeCategoryFilter)) activeCategoryFilter = null;
       const categoryButton = (name, count, selected, value) =>
-        '<button type="button" data-category="' + escapeHtml(value) + '" title="' + escapeHtml(name) + '" aria-pressed="' + selected +
-        '" class="group w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ' +
-        (selected ? 'bg-amber-50 text-amber-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900') +
-        '"><span class="h-1.5 w-1.5 shrink-0 rounded-full ' + (selected ? 'bg-amber-500' : 'bg-slate-200 group-hover:bg-slate-400') +
-        '"></span><span class="min-w-0 flex-1 truncate text-[11px] ' + (selected ? 'font-semibold' : 'font-medium') +
-        '">' + escapeHtml(name) + '</span><span class="shrink-0 min-w-[22px] text-right font-mono text-[10px] ' +
+        '<button type="button" data-category="' + escapeHtml(value) + '" title="' + escapeHtml(name + ': ' + count + ' Deals') + '" aria-pressed="' + selected +
+        '" class="inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 ' +
+        (selected ? 'border-amber-300 bg-amber-50 text-amber-900 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50 hover:text-slate-900') +
+        '"><span class="min-w-0 break-words">' + escapeHtml(name) + '</span><span class="shrink-0 font-mono text-[10px] ' +
         (selected ? 'text-amber-800' : 'text-slate-400') + '">' + count + '</span></button>';
       document.getElementById('category-filters').innerHTML =
         categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
@@ -1076,8 +1072,6 @@
 
       container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
-        const progressMessage = activeMarketResearch.get(String(deal.id));
-        const progressBanner = progressMessage ? '<div id="market-progress-' + escapeHtml(String(deal.id)) + '" class="albert-working" role="status" aria-live="polite"><span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(progressMessage) + '</span></div>' : '';
         const rawPrices = Array.isArray(deal.market_prices)
           ? deal.market_prices
           : [];
@@ -1166,7 +1160,6 @@
         return `
 
           <article id="deal-card-${dealId}" data-market-verified="${deal.market_deep_dive?.verified_lowest_total_price != null}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            ${progressBanner}
             <!-- DEAL HEADER -->
 
             <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
