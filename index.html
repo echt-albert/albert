@@ -109,10 +109,10 @@
           <span>📊 Deep Dive Market</span><span data-count="DEEP_DIVE" class="font-mono text-[11px]">–</span>
         </button>
         <button type="button" data-view="LEARN" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
-          <span>🧠 Langzeithirn (Lernen)</span><span data-count="LEARN" class="font-mono text-[11px]">–</span>
+          <span>🧠 Erfahrung festhalten</span><span data-count="LEARN" class="font-mono text-[11px]">–</span>
         </button>
         <button type="button" data-view="REJECT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
-          <span>❌ Zunächst ablehnen</span><span data-count="REJECT" class="font-mono text-[11px]">–</span>
+          <span>❌ Ablehnen</span><span data-count="REJECT" class="font-mono text-[11px]">–</span>
         </button>
       </nav>
       <div class="mt-8 border-t border-slate-100 pt-4">
@@ -538,9 +538,35 @@
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
-      const comment = window.prompt('Deine Einschätzung zu diesem Posten (optional):', '');
-      if (comment === null) return;
-      showStatus('Speichere Feedback und starte VERDICT …', false);
+      const panel = document.getElementById('decision-panel-' + dealId);
+      if (!panel) return;
+      const labels = {WATCH:'Beobachten',DEEP_DIVE:'Markt genauer prüfen',LEARN:'Erfahrung festhalten',REJECT:'Posten ablehnen'};
+      const reasons = ['Zu hoher EK','Nachfrage unklar','Zu viel Kapital','Versand / Retouren','Produktidentität unklar','Aktuell kein Budget','Andere Begründung'];
+      panel.classList.remove('hidden');
+      panel.innerHTML = '<div class="text-xs font-semibold text-slate-800 mb-2">Dein nächster Schritt: ' + escapeHtml(labels[action]) + '</div>' +
+        '<p class="text-xs text-slate-600 mb-3">Warum? Ein Grund hilft Albert, ähnliche Fälle später richtig einzuordnen. Optional.</p>' +
+        '<div class="flex flex-wrap gap-2 mb-3">' + reasons.map((reason,i)=>'<button type="button" class="decision-reason px-2 py-1 rounded-md border border-slate-300 bg-white text-[11px]" data-reason="' + escapeHtml(reason) + '">' + escapeHtml(reason) + '</button>').join('') + '</div>' +
+        '<textarea id="decision-note-' + dealId + '" maxlength="1400" rows="2" placeholder="Weitere Einschätzung (optional)" class="w-full text-xs rounded-lg border border-slate-300 p-2 mb-3"></textarea>' +
+        '<div class="flex gap-2 items-center"><button type="button" id="decision-save-' + dealId + '" class="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold">Entscheidung bestätigen</button><button type="button" id="decision-cancel-' + dealId + '" class="px-3 py-2 text-xs text-slate-600">Abbrechen</button></div>' +
+        '<p class="text-[11px] text-slate-500 mt-2">Dein Urteil wird zum Deal gespeichert. Es ist kein automatisch bestätigter Marktbeleg.</p>';
+      let selectedReason = '';
+      panel.querySelectorAll('.decision-reason').forEach(button=>button.addEventListener('click',()=>{
+        selectedReason = selectedReason === button.dataset.reason ? '' : button.dataset.reason;
+        panel.querySelectorAll('.decision-reason').forEach(item=>{
+          const active = item.dataset.reason === selectedReason;
+          item.classList.toggle('bg-amber-100',active);
+          item.classList.toggle('border-amber-500',active);
+        });
+      }));
+      const confirmed = await new Promise(resolve=>{
+        document.getElementById('decision-save-' + dealId).addEventListener('click',()=>resolve(true),{once:true});
+        document.getElementById('decision-cancel-' + dealId).addEventListener('click',()=>resolve(false),{once:true});
+      });
+      if (!confirmed) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+      const note = document.getElementById('decision-note-' + dealId).value.trim();
+      const comment = (selectedReason ? '[Grund: ' + selectedReason + '] ' : '') + note;
+      panel.innerHTML = '<div class="text-xs text-amber-800 flex items-center gap-2"><span class="albert-spinner"></span> Entscheidung wird gespeichert …</div>';
+      showStatus('Speichere Entscheidung zum Deal …', false);
       try {
         const { data: deal, error: readError } = await supabaseClient
           .from('discoveries').select('*').eq('id', dealId).single();
@@ -580,7 +606,7 @@
           return;
         }
         if (!deal.brain_analysis) {
-          showStatus('Feedback gespeichert. Für diesen älteren Posten fehlt die Analyse vor VERDICT.', false);
+          showStatus('✓ Entscheidung und Begründung gespeichert. Für diesen älteren Posten fehlt die Analyse vor VERDICT.', false);
           await fetchDeals();
           return;
         }
@@ -1174,7 +1200,7 @@
               <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200/50 space-y-2">
 
                 <span class="font-mono font-bold text-amber-900 uppercase tracking-wider text-[10px] block">
-                  Intelligence Feedback & Aktionen
+                  Dein nächster Schritt
                 </span>
 
                 <div class="flex flex-wrap gap-2 pt-1">
@@ -1212,7 +1238,8 @@
                   </button>
 
                 </div>
-
+                <div id="decision-panel-${dealId}" class="hidden mt-3 bg-white rounded-lg border border-amber-200 p-3" aria-live="polite"></div>
+                <p class="text-[11px] text-slate-600 mt-2">Wähle eine Aktion. Albert fragt nur nach einer optionalen Begründung.</p>
               </div>
 
 
