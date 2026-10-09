@@ -907,7 +907,7 @@
                 ${activeDealView !== 'INBOX' ? `<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>` : ''}
                 <button
                   onclick="toggleDeepDive('${cardId}')"
-                  class="${compact ? 'hidden ' : ''}bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
                   class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
                 >
                   <span id="btn-text-${cardId}">
