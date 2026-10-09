@@ -739,7 +739,7 @@
     const categoryEditor = document.createElement('div');
     categoryEditor.id = 'albert-category-editor';
     categoryEditor.className = 'fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/30 p-4';
-    categoryEditor.innerHTML = '<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-200" role="dialog" aria-modal="true" aria-label="Deal-Kategorie bearbeiten"><div class="flex items-center justify-between mb-4"><h3 class="font-semibold text-slate-900 text-sm">Kategorie festlegen</h3><button type="button" id="category-close" class="text-slate-400 hover:text-slate-800 text-xl" aria-label="Schließen">×</button></div><p id="category-product" class="text-xs text-slate-500 mb-3 line-clamp-2"></p><label for="category-edit-input" class="block text-[11px] text-slate-600 mb-1.5">Vorhandene Kategorie wählen oder neue eingeben</label><input id="category-edit-input" list="category-edit-options" maxlength="60" autocomplete="off" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/><datalist id="category-edit-options"></datalist><p id="category-edit-error" class="hidden text-xs text-rose-600 mt-2"></p><div class="flex gap-2 mt-4"><button id="category-cancel" class="flex-1 border border-slate-200 rounded-lg py-2 text-xs text-slate-600">Abbrechen</button><button id="category-save" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-semibold rounded-lg py-2 text-xs">Speichern</button></div></div>';
+    categoryEditor.innerHTML = '<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-200" role="dialog" aria-modal="true" aria-label="Deal-Kategorie bearbeiten"><div class="flex items-center justify-between mb-4"><h3 class="font-semibold text-slate-900 text-sm">Kategorie festlegen</h3><button type="button" id="category-close" class="text-slate-400 hover:text-slate-800 text-xl" aria-label="Schließen">×</button></div><p id="category-product" class="text-xs text-slate-500 mb-3 line-clamp-2"></p><label for="category-edit-select" class="block text-[11px] text-slate-600 mb-1.5">Kategorie auswählen</label><select id="category-edit-select" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"></select><div id="category-new-wrap" class="hidden mt-3"><label for="category-edit-input" class="block text-[11px] text-slate-600 mb-1.5">Neue Kategorie benennen</label><input id="category-edit-input" maxlength="60" autocomplete="off" placeholder="z. B. Elektro-Kleingeräte" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/></div><p id="category-edit-error" class="hidden text-xs text-rose-600 mt-2"></p><div class="flex gap-2 mt-4"><button id="category-cancel" class="flex-1 border border-slate-200 rounded-lg py-2 text-xs text-slate-600">Abbrechen</button><button id="category-save" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-semibold rounded-lg py-2 text-xs">Speichern</button></div></div>';
     document.body.appendChild(categoryEditor);
     let editingCategoryDealId = null;
     function closeCategoryEditor() { categoryEditor.classList.add('hidden'); categoryEditor.classList.remove('flex'); editingCategoryDealId = null; }
@@ -748,19 +748,25 @@
       if (!deal) return;
       editingCategoryDealId = String(dealId);
       const names = new Set([...knownCategories, 'Haushalt & Wohnen', 'Technik & Elektronik', 'Freizeit & Familie', 'Büro & Gewerbe', 'Pflege & Verbrauch', 'Sonstiges']);
-      document.getElementById('category-edit-options').innerHTML = [...names].sort((a,b) => a.localeCompare(b,'de')).map(name => '<option value="' + escapeHtml(name) + '"></option>').join('');
+      const current = categoryName(deal);
+      names.add(current);
+      const select = document.getElementById('category-edit-select');
+      select.innerHTML = [...names].sort((a,b) => a.localeCompare(b,'de')).map(name => '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>').join('') + '<option value="__NEW__">＋ Neue Kategorie erstellen …</option>';
+      select.value = current;
       document.getElementById('category-product').textContent = deal.product_name || 'Deal';
-      document.getElementById('category-edit-input').value = categoryName(deal);
+      document.getElementById('category-edit-input').value = '';
+      document.getElementById('category-new-wrap').classList.add('hidden');
       document.getElementById('category-edit-error').classList.add('hidden');
       categoryEditor.classList.remove('hidden'); categoryEditor.classList.add('flex');
-      document.getElementById('category-edit-input').focus();
+      document.getElementById('category-edit-select').focus();
     }
     async function saveDealCategory() {
       const dealId = editingCategoryDealId;
       const input = document.getElementById('category-edit-input');
       const errorEl = document.getElementById('category-edit-error');
       if (!dealId) return;
-      let category = input.value.trim().replace(/\\s+/g, ' ');
+      const select = document.getElementById('category-edit-select');
+      let category = (select.value === '__NEW__' ? input.value : select.value).trim().replace(/\\s+/g, ' ');
       const existing = [...knownCategories].find(name => name.toLocaleLowerCase('de') === category.toLocaleLowerCase('de'));
       if (existing) category = existing;
       if (category.length < 2 || category.length > 60) {
@@ -786,6 +792,11 @@
     document.getElementById('category-close').addEventListener('click', closeCategoryEditor);
     document.getElementById('category-cancel').addEventListener('click', closeCategoryEditor);
     document.getElementById('category-save').addEventListener('click', saveDealCategory);
+    document.getElementById('category-edit-select').addEventListener('change', event => {
+      const isNew = event.target.value === '__NEW__';
+      document.getElementById('category-new-wrap').classList.toggle('hidden', !isNew);
+      if (isNew) document.getElementById('category-edit-input').focus();
+    });
     document.getElementById('category-edit-input').addEventListener('keydown', event => { if (event.key === 'Enter') saveDealCategory(); });
     categoryEditor.addEventListener('click', event => { if (event.target === categoryEditor) closeCategoryEditor(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && editingCategoryDealId) closeCategoryEditor(); });
