@@ -887,21 +887,31 @@
         const node = document.getElementById('target-audience-' + key);
         if(!node) return;
         node.replaceChildren();
-        const section = (title,items) => {
-          const wrap=document.createElement('div');
-          const label=document.createElement('div');
-          label.className='text-[10px] font-semibold uppercase tracking-wider text-slate-500 mono mb-1';
-          label.textContent=title;
+        const section = (title, items) => {
+          const wrap = document.createElement('div');
+          const label = document.createElement('div');
+          label.className = 'text-[10px] font-semibold uppercase tracking-wider text-slate-500 mono mb-1';
+          label.textContent = title;
           wrap.appendChild(label);
-          const p=document.createElement('p');
-          p.className='text-[12px] leading-relaxed text-slate-700';
-          p.textContent=Array.isArray(items)?items.join(' · '):String(items||'—');
-          wrap.appendChild(p);
+          const list = document.createElement('ul');
+          list.className = 'list-disc pl-4 space-y-1 text-[12px] leading-relaxed text-slate-700';
+          const values = Array.isArray(items) ? items : [items];
+          values.filter(Boolean).forEach(value => {
+            const li = document.createElement('li');
+            li.textContent = String(value);
+            list.appendChild(li);
+          });
+          wrap.appendChild(list);
           node.appendChild(wrap);
         };
-        section('Primäre Zielgruppe',data.primary_audience);
-        section('Weitere Zielgruppen',data.other_audiences);
-        section('Kaufmotive',data.buying_motives);
+        section('Primäre Zielgruppe', data.primary_audience);
+        section('Weitere Zielgruppen', data.other_audiences);
+        section('Kaufmotive', data.buying_motives);
+        section('Demografische Einschätzung · geschätzt', [
+          'Geschlecht: ' + (data.gender_estimate || 'Keine klare Eingrenzung'),
+          'Alter: ' + (data.age_estimate || 'Nicht belastbar eingrenzbar'),
+          'Einkommensniveau: ' + (data.income_estimate || 'Einkommensübergreifend')
+        ]);
       } catch(e) {
         console.warn('Zielgruppen nicht abrufbar:',e);
         const node=document.getElementById('target-audience-'+key);
