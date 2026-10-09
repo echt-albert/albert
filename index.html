@@ -538,10 +538,29 @@
     // =======================================================
 
     const activeTasks = new Map();
+    let activityNoticeTimer;
+    let activityNoticeVersion = 0;
+    function setActivityAppearance(state) {
+      const bar = document.getElementById('albert-activity');
+      const spinner = document.getElementById('albert-activity-spinner');
+      const heading = bar.querySelector('.font-semibold.text-slate-900');
+      bar.classList.remove('border-cyan-100', 'border-emerald-200', 'border-amber-200', 'border-rose-200', 'bg-emerald-50', 'bg-amber-50', 'bg-rose-50');
+      bar.classList.add(state === 'success' ? 'border-emerald-200' : state === 'warning' ? 'border-amber-200' : state === 'error' ? 'border-rose-200' : 'border-cyan-100');
+      if (state !== 'working') bar.classList.add(state === 'success' ? 'bg-emerald-50' : state === 'warning' ? 'bg-amber-50' : 'bg-rose-50');
+      spinner.classList.toggle('albert-spinner', state === 'working');
+      spinner.textContent = state === 'success' ? '✓' : state === 'warning' ? '!' : state === 'error' ? '×' : '';
+      spinner.classList.toggle('text-emerald-700', state === 'success');
+      spinner.classList.toggle('text-amber-700', state === 'warning');
+      spinner.classList.toggle('text-rose-700', state === 'error');
+      heading.firstChild.textContent = state === 'success' ? '✓ MISSION ABGESCHLOSSEN ' : state === 'warning' ? 'WEITERE DATEN BENÖTIGT ' : state === 'error' ? 'MISSION NICHT ABGESCHLOSSEN ' : 'Albert arbeitet ';
+    }
     function renderAlbertActivity() {
       const bar = document.getElementById('albert-activity');
       const tasks = [...activeTasks.values()];
       if (!tasks.length) { bar.classList.add('hidden'); return; }
+      clearTimeout(activityNoticeTimer);
+      activityNoticeVersion++;
+      setActivityAppearance('working');
       bar.classList.remove('hidden');
       document.getElementById('albert-activity-count').textContent = tasks.length > 1 ? '· ' + tasks.length + ' Vorgänge' : '';
       document.getElementById('albert-activity-message').textContent = tasks.map(t => t.label + ': ' + t.message).join('  ·  ');
@@ -550,16 +569,23 @@
       activeTasks.set(String(key), {label, message});
       renderAlbertActivity();
     }
-    function finishAlbertActivity(key, label, message, failed = false) {
+    function showActivityResult(label, message, state) {
+      if (activeTasks.size) return;
+      clearTimeout(activityNoticeTimer);
+      const version = ++activityNoticeVersion;
+      const bar = document.getElementById('albert-activity');
+      setActivityAppearance(state);
+      bar.classList.remove('hidden');
+      document.getElementById('albert-activity-count').textContent = '';
+      document.getElementById('albert-activity-message').textContent = label + ': ' + message;
+      activityNoticeTimer = setTimeout(() => {
+        if (!activeTasks.size && activityNoticeVersion === version) bar.classList.add('hidden');
+      }, 8000);
+    }
+    function finishAlbertActivity(key, label, message, failed = false, incomplete = false) {
       activeTasks.delete(String(key));
-      renderAlbertActivity();
-      if (!activeTasks.size) {
-        const bar = document.getElementById('albert-activity');
-        bar.classList.remove('hidden');
-        document.getElementById('albert-activity-count').textContent = '';
-        document.getElementById('albert-activity-message').textContent = (failed ? '⚠ ' : '✓ ') + label + ': ' + message;
-        setTimeout(() => { if (!activeTasks.size) bar.classList.add('hidden'); }, 12000);
-      }
+      if (activeTasks.size) { renderAlbertActivity(); return; }
+      showActivityResult(label, message, failed ? 'error' : incomplete ? 'warning' : 'success');
     }
     const activeMarketResearch = new Map();
     function updateMarketResearch(dealId, message) {
@@ -640,10 +666,8 @@
             const {error:saveError}=await supabaseClient.from('discoveries')
               .update({market_deep_dive:researchData.report}).eq('id',dealId);
             if(saveError) throw saveError;
-            showStatus('Deep Dive abgeschlossen: Recherchehinweise gespeichert, noch nicht verifiziert.',false);
-            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert (nicht verifiziert).');
+            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert – Marktangaben noch nicht verifiziert.', false, true);
           } catch(researchError) {
-            showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
             finishAlbertActivity('deep-' + dealId, 'Deep Dive', researchError.message, true);
           } finally {
             clearInterval(progressTimer);
@@ -1787,11 +1811,9 @@
         );
         finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen.');
         activeDealView = 'SOFORT';
-        showStatus('Sofort-Jagd abgeschlossen · Ergebnisse unter ⚡ Sofort-Jagd.', false);
         setTimeout(fetchDeals, 1500);
       } catch (err) {
         finishAlbertActivity('hunt', 'Sofort-Jagd', err.message, true);
-        showStatus('Fehler bei Sofort-Jagd: ' + err.message, true);
       }
     };
 
