@@ -846,6 +846,32 @@
     function isDealExpanded(id, view) {
       return dealExpansion.get(String(id)) === true;
     }
+    // Einheitliche, nutzerfreundliche Behandlung von KI-Fehlern.
+    // Keine automatischen Wiederholungen: Jeder Retry wird bewusst ausgelöst.
+    function aiFailureMessage(error, label) {
+      const status = Number(error?.context?.status || error?.status || 0);
+      const message = String(error?.message || '').toLowerCase();
+      if (status === 429 || /rate.limit|too many requests|quota/.test(message))
+        return label + ': Der KI-Dienst ist momentan ausgelastet.';
+      if ([408, 504].includes(status) || /timeout|timed out|abort/.test(message))
+        return label + ': Die Anfrage hat zu lange gedauert.';
+      if (status >= 500 || /failed to fetch|network|fetch failed/.test(message))
+        return label + ': Der Dienst ist vorübergehend nicht erreichbar.';
+      return label + ': Die Analyse konnte nicht abgeschlossen werden.';
+    }
+    function showAiRetry(target, message, retry) {
+      if (!target) return;
+      target.replaceChildren();
+      const note = document.createElement('p');
+      note.className = 'text-slate-500';
+      note.textContent = message;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mt-2 text-[11px] font-semibold text-violet-700 hover:underline';
+      button.textContent = 'Erneut versuchen ↻';
+      button.addEventListener('click', retry, { once: true });
+      target.append(note, button);
+    }
     const portraitRequests = new Map();
     const portraitCache = new Map();
     async function loadProductPortrait(id) {
@@ -867,14 +893,14 @@
           portraitCache.set(key, data.portrait);
           current.textContent = data.portrait;
         } else if (data?.status === 'pending') {
-          current.textContent = 'Produktporträt wird recherchiert. Bitte den Deal in Kürze erneut öffnen.';
+          showAiRetry(current, 'Produktporträt wird noch verarbeitet.', () => loadProductPortrait(key));
         } else {
-          current.textContent = 'Für dieses Modell konnten noch keine ausreichend verlässlichen Merkmale bestätigt werden.';
+          showAiRetry(current, 'Für dieses Modell liegt noch kein verlässliches Produktporträt vor.', () => loadProductPortrait(key));
         }
       } catch (error) {
         console.warn('Produktporträt nicht verfügbar:', error);
         const current = document.getElementById('product-portrait-' + key);
-        if (current) current.textContent = 'Produktporträt momentan nicht abrufbar.';
+        showAiRetry(current, aiFailureMessage(error, 'Produktporträt'), () => loadProductPortrait(key));
       } finally {
         portraitRequests.delete(key);
       }
@@ -894,7 +920,12 @@
       target.textContent = 'Albert ermittelt mögliche Käufergruppen …';
       try {
         const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key}});
-        if(error || data?.status !== 'ready') throw error || new Error('Audience unavailable');
+        if(error) throw error;
+        if(data?.status === 'pending') {
+          showAiRetry(document.getElementById('target-audience-'+key), 'Zielgruppenanalyse wird noch verarbeitet.', () => loadTargetAudience(key));
+          return;
+        }
+        if(data?.status !== 'ready') throw new Error('Audience unavailable');
         const node = document.getElementById('target-audience-' + key);
         if(!node) return;
         node.replaceChildren();
@@ -927,7 +958,7 @@
       } catch(e) {
         console.warn('Zielgruppen nicht abrufbar:',e);
         const node=document.getElementById('target-audience-'+key);
-        if(node) node.textContent='Zielgruppenanalyse momentan nicht abrufbar.';
+        showAiRetry(node, aiFailureMessage(e, 'Zielgruppenanalyse'), () => loadTargetAudience(key));
       } finally {
         audienceRequests.delete(key);
       }
