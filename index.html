@@ -860,7 +860,9 @@
         .from('deal_category_labels').select('discovery_id,category');
       if (!categoryError) {
         categoryLabels = new Map((savedCategories || []).map(row => [String(row.discovery_id), row.category]));
-        for (const row of savedCategories || []) knownCategories.add(row.category);
+        knownCategories = new Set((savedCategories || []).map(row => row.category));
+      } else {
+        console.warn('Kategorielabels konnten nicht geladen werden:', categoryError.message);
       }
       const { data: feedbackRows, error: feedbackReadError } = await supabaseClient
         .from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id', { ascending: false });
@@ -904,10 +906,6 @@
         categoryButton('Alle Kategorien', folderDeals.length, !activeCategoryFilter, '__ALL__') +
         [...categoryCounts.entries()].sort((a,b) => a[0].localeCompare(b[0],'de'))
           .map(([name,count]) => categoryButton(name,count,activeCategoryFilter === name,name)).join('');
-      const categoryOptions = [...new Set([...knownCategories, ...categoryCounts.keys()])]
-        .sort((a,b) => a.localeCompare(b,'de'));
-      const categorySuggestions = '<datalist id="albert-category-suggestions">' +
-        categoryOptions.map(name => '<option value="' + escapeHtml(name) + '"></option>').join('') + '</datalist>';
       const visibleDeals = activeCategoryFilter ? folderDeals.filter(deal => categoryName(deal) === activeCategoryFilter) : folderDeals;
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
@@ -921,7 +919,7 @@
       }
 
 
-      container.innerHTML = categorySuggestions + viewHeading + visibleDeals.map((deal, index) => {
+      container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
         const progressMessage = activeMarketResearch.get(String(deal.id));
         const progressBanner = progressMessage ? '<div id="market-progress-' + escapeHtml(String(deal.id)) + '" class="albert-working" role="status" aria-live="polite"><span class="albert-spinner" aria-hidden="true"></span><span>' + escapeHtml(progressMessage) + '</span></div>' : '';
