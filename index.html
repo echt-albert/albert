@@ -726,7 +726,6 @@
     // Offen/geschlossen pro Deal merken, auch bei automatischem Refresh.
     const dealExpansion = new Map();
     function isDealExpanded(id, view) {
-      if (view === 'INBOX' || view === 'SOFORT') return dealExpansion.get(String(id)) !== false;
       return dealExpansion.get(String(id)) === true;
     }
     function toggleDealCard(id) {
@@ -942,7 +941,7 @@
 
                 </div>
 
-                ${activeDealView !== 'INBOX' ? `<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>` : ''}
+                ${`<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>`}
                 <button
                   onclick="toggleDeepDive('${cardId}')"
                   class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors cursor-pointer"
@@ -962,6 +961,9 @@
               <span class="font-semibold text-amber-900">${escapeHtml(actionLabel)}</span>
               <span>EK: ${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'unbekannt'}</span>
               <span>Urteil: ${grade}</span>
+              <span class="font-semibold text-amber-900">04 · QUANTUM</span>
+              <span>Ø Markt: ${avgMarket > 0 ? avgMarket.toFixed(2) + ' €' : '—'}</span>
+              <span>Differenz: ${absoluteMargin !== null ? absoluteMargin.toFixed(2) + ' €' : '—'}</span>
               ${latestFeedback?.comment ? `<span class="truncate max-w-[360px]" title="${escapeHtml(latestFeedback.comment)}">${escapeHtml(latestFeedback.comment)}</span>` : ''}
             </div>
 
