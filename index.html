@@ -615,13 +615,27 @@
         const line=document.createElement('span');line.className='block text-[10px] text-slate-500 mt-1';
         line.textContent=item.at+' · '+(item.dealId?'Deal #'+item.dealId:'Recherche');
         const detail=document.createElement('span');detail.className='result-detail';
-        detail.textContent=item.message+(item.dealId?' · Klicken: Deal ansehen':'');
+        detail.textContent=item.message+(item.dealId?' · Klicken: Deal ansehen':' · Klicken: Ergebnisdetails');
         button.append(title,line,detail);
         button.title=item.message+(item.dealId?' – zum Deal springen':'');
         if(item.dealId)button.addEventListener('click',async()=>{
-          activeDealView='DEEP_DIVE';
-          await fetchDeals();
-          const card=document.getElementById('deal-card-'+item.dealId);
+          // Ergebnisse können aus jeder Deal-Ablage stammen; zuerst dort suchen,
+          // wo der Deal tatsächlich liegt, statt pauschal Deep Dive zu öffnen.
+          let card=document.getElementById('deal-card-'+item.dealId);
+          if(!card){
+            activeDealView='INBOX';
+            activeCategoryFilter=null;activeGradeFilter=null;
+            await fetchDeals();
+            card=document.getElementById('deal-card-'+item.dealId);
+          }
+          if(!card){
+            for(const view of ['DEEP_DIVE','WATCH','LEARN','REJECT','SOFORT']){
+              activeDealView=view;
+              await fetchDeals();
+              card=document.getElementById('deal-card-'+item.dealId);
+              if(card)break;
+            }
+          }
           if(card){
             document.querySelectorAll('.albert-deal-located').forEach(el=>el.classList.remove('albert-deal-located'));
             card.classList.remove('albert-deal-located');void card.offsetWidth;
@@ -630,12 +644,28 @@
             setTimeout(()=>card.classList.remove('albert-deal-located'),8500);
           } else showStatus('Deal #'+item.dealId+' ist in dieser Ansicht nicht verfügbar.',true);
         });
-        else button.addEventListener('click',()=>{button.focus();});
+        else button.addEventListener('click',()=>{showCompletedResultDetails(item);});
         list.append(button);
       });
     }
+    function showCompletedResultDetails(item) {
+      const modal=document.getElementById('albert-deep-dive-result');
+      if(!modal)return;
+      modal.classList.remove('hidden');modal.classList.add('flex');
+      modal.innerHTML='<div class="absolute inset-0 bg-slate-900/50" data-result-close="true"></div>'+
+        '<section role="dialog" aria-modal="true" aria-label="Albert Arbeitsergebnis" class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">'+
+        '<h2 class="font-semibold text-slate-900">'+escapeHtml(item.label)+'</h2>'+
+        '<p class="mt-2 text-xs text-slate-500">'+escapeHtml(item.at)+' · '+escapeHtml(item.state)+'</p>'+
+        '<p class="mt-4 text-sm text-slate-700 whitespace-pre-wrap">'+escapeHtml(item.message)+'</p>'+
+        '<button type="button" data-result-close="true" class="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-white text-sm">Schließen</button></section>';
+      modal.addEventListener('click',function close(e){
+        if(!e.target.closest('[data-result-close]'))return;
+        modal.classList.add('hidden');modal.classList.remove('flex');modal.replaceChildren();
+        modal.removeEventListener('click',close);
+      });
+    }
     function recordCompletedResult(id,label,message,state) {
-      const match=/^deep-(\\d+)$/.exec(id);
+      const match=/^(?:deep|oracle)-(\\d+)$/.exec(id);
       const result={id,label,message,state,dealId:match?match[1]:null,at:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})};
       completedResults.unshift(result);
       completedResults.splice(8);
