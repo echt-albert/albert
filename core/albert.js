@@ -111,6 +111,12 @@ const Albert = {
 
     for (const name of this.getDivisions()) {
 
+      // VERDICT requires an explicit human feedback event after QUANTUM.
+      if (name === "VERDICT" && !input.humanFeedback) {
+        return { success: true, status: "AWAITING_HUMAN", results, executionLog,
+          pendingDivision: "VERDICT" };
+      }
+
       const startedAt = Date.now();
 
       try {
