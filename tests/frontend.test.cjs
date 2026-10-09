@@ -93,3 +93,13 @@ test('retry button invokes callback only when clicked', () => {
   listeners[0].fn();
   assert.equal(called, 1);
 });
+
+test('deal folders follow human verdict first, then research origin', () => {
+  assert.match(script, /latestAction\.has\(key\).*\['WATCH','DEEP_DIVE','LEARN','REJECT'\]\.includes\(row\.action\)/);
+  assert.match(script, /const dealFolder = deal => latestAction\.get\(String\(deal\.id\)\) \|\| \(deal\.hunt_origin === 'SOFORT' \? 'SOFORT' : 'INBOX'\)/);
+  const folder = (deal, latestAction) => latestAction.get(String(deal.id)) || (deal.hunt_origin === 'SOFORT' ? 'SOFORT' : 'INBOX');
+  assert.equal(folder({id: 1, hunt_origin: 'PERMANENT'}, new Map()), 'INBOX');
+  assert.equal(folder({id: 2, hunt_origin: 'SOFORT'}, new Map()), 'SOFORT');
+  assert.equal(folder({id: 3, hunt_origin: 'SOFORT'}, new Map([['3', 'WATCH']])), 'WATCH');
+  assert.equal(folder({id: 4, hunt_origin: 'PERMANENT'}, new Map([['4', 'DEEP_DIVE']])), 'DEEP_DIVE');
+});
