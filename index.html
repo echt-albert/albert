@@ -151,24 +151,18 @@
       </defs>
     </svg>
 
-    <!-- PULSE -->
-
-    <div class="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/60 mt-6">
-
-      <div class="flex items-center gap-2 mb-1">
-
-        <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
-
-        <span class="text-[11px] font-mono font-semibold text-cyan-900">
-          15m Pulse Active
-        </span>
-
+    <!-- Zentrale Status- und Aktivitätsanzeige -->
+    <div id="albert-activity" class="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-3.5 mt-6 transition-colors" role="status" aria-live="polite" aria-atomic="true">
+      <div class="flex items-start gap-2.5">
+        <span id="albert-activity-spinner" class="mt-1 inline-flex h-2 w-2 shrink-0 rounded-full bg-cyan-500" aria-hidden="true"></span>
+        <div class="min-w-0 flex-1">
+          <div class="font-mono text-[11px] font-semibold text-cyan-900">
+            <span id="albert-activity-title">ALBERT BEREIT</span>
+            <span id="albert-activity-count" class="text-slate-500 font-normal"></span>
+          </div>
+          <div id="albert-activity-message" class="text-[10px] text-slate-500 mt-1 break-words leading-relaxed">Wartet auf den nächsten Rechercheauftrag.</div>
+        </div>
       </div>
-
-      <p class="text-[10px] text-slate-400">
-        Autonome Pipeline im Hintergrund bereit.
-      </p>
-
     </div>
 
   </aside>
@@ -314,10 +308,6 @@
           </div>
 
         </section>
-    <div id="albert-activity" class="hidden rounded-xl border border-cyan-100 bg-white shadow-sm px-3 py-3 text-xs mt-3" role="status" aria-live="polite">
-      <div class="flex items-center gap-3"><span id="albert-activity-spinner" class="albert-spinner"></span><div class="min-w-0 flex-1"><div class="font-semibold text-slate-900">Albert arbeitet <span id="albert-activity-count" class="text-slate-500 font-normal"></span></div><div id="albert-activity-message" class="text-slate-600 mt-1 break-words leading-relaxed"></div></div></div>
-    </div>
-
 
         </div>
       </div>
@@ -354,17 +344,10 @@
     // =======================================================
 
     function showStatus(text, isError = false) {
-      // Meldungen bleiben im rechten Aktivitätsbereich; kein zweiter Banner über den Deals.
-      const bar = document.getElementById('albert-activity');
-      if (!bar || activeTasks.size) return;
-      bar.classList.remove('hidden');
-      document.getElementById('albert-activity-count').textContent = '';
-      document.getElementById('albert-activity-message').textContent = (isError ? '⚠ ' : '✓ ') + text;
-      clearTimeout(window.albertStatusHideTimer);
-      window.albertStatusHideTimer = setTimeout(() => {
-        if (!activeTasks.size) bar.classList.add('hidden');
-      }, 12000);
+      if (activeTasks.size) return;
+      showPulseNotice(isError ? 'MISSION NICHT ABGESCHLOSSEN' : 'ALBERT MELDET', text, isError ? 'error' : 'success');
     }
+
 
     // =======================================================
     // ALBERT CHAT
@@ -538,28 +521,45 @@
     // =======================================================
 
     const activeTasks = new Map();
-    function renderAlbertActivity() {
+    let pulseNoticeTimer;
+    let pulseVersion = 0;
+    function paintPulse(state, title, message, count = '') {
       const bar = document.getElementById('albert-activity');
+      const icon = document.getElementById('albert-activity-spinner');
+      const heading = document.getElementById('albert-activity-title');
+      bar.classList.remove('border-slate-200','bg-slate-50/80','border-cyan-200','bg-cyan-50','border-emerald-200','bg-emerald-50','border-amber-200','bg-amber-50','border-rose-200','bg-rose-50');
+      const tones = {ready:['border-slate-200','bg-slate-50/80'],working:['border-cyan-200','bg-cyan-50'],success:['border-emerald-200','bg-emerald-50'],warning:['border-amber-200','bg-amber-50'],error:['border-rose-200','bg-rose-50']};
+      bar.classList.add(...tones[state]);
+      icon.className = 'mt-1 inline-flex h-2 w-2 shrink-0 rounded-full ' + (state === 'working' ? 'bg-cyan-500 animate-pulse' : state === 'success' ? 'bg-emerald-500' : state === 'warning' ? 'bg-amber-500' : state === 'error' ? 'bg-rose-500' : 'bg-slate-400');
+      heading.textContent = title;
+      document.getElementById('albert-activity-count').textContent = count;
+      document.getElementById('albert-activity-message').textContent = message;
+    }
+    function resetPulse() {
+      if (!activeTasks.size) paintPulse('ready', 'ALBERT BEREIT', 'Wartet auf den nächsten Rechercheauftrag.');
+    }
+    function renderAlbertActivity() {
+      if (!activeTasks.size) { resetPulse(); return; }
+      clearTimeout(pulseNoticeTimer);
+      pulseVersion++;
       const tasks = [...activeTasks.values()];
-      if (!tasks.length) { bar.classList.add('hidden'); return; }
-      bar.classList.remove('hidden');
-      document.getElementById('albert-activity-count').textContent = tasks.length > 1 ? '· ' + tasks.length + ' Vorgänge' : '';
-      document.getElementById('albert-activity-message').textContent = tasks.map(t => t.label + ': ' + t.message).join('  ·  ');
+      paintPulse('working', 'ALBERT ARBEITET', tasks.map(t => t.label + ': ' + t.message).join(' · '), tasks.length > 1 ? ' · ' + tasks.length + ' Vorgänge' : '');
     }
     function setAlbertActivity(key, label, message) {
       activeTasks.set(String(key), {label, message});
       renderAlbertActivity();
     }
-    function finishAlbertActivity(key, label, message, failed = false) {
+    function showPulseNotice(title, message, state) {
+      if (activeTasks.size) return;
+      clearTimeout(pulseNoticeTimer);
+      const version = ++pulseVersion;
+      paintPulse(state, title, message);
+      pulseNoticeTimer = setTimeout(() => { if (!activeTasks.size && pulseVersion === version) resetPulse(); }, 8000);
+    }
+    function finishAlbertActivity(key, label, message, failed = false, incomplete = false) {
       activeTasks.delete(String(key));
-      renderAlbertActivity();
-      if (!activeTasks.size) {
-        const bar = document.getElementById('albert-activity');
-        bar.classList.remove('hidden');
-        document.getElementById('albert-activity-count').textContent = '';
-        document.getElementById('albert-activity-message').textContent = (failed ? '⚠ ' : '✓ ') + label + ': ' + message;
-        setTimeout(() => { if (!activeTasks.size) bar.classList.add('hidden'); }, 12000);
-      }
+      if (activeTasks.size) { renderAlbertActivity(); return; }
+      showPulseNotice(failed ? 'MISSION NICHT ABGESCHLOSSEN' : incomplete ? 'WEITERE DATEN BENÖTIGT' : 'MISSION ABGESCHLOSSEN ✓', label + ': ' + message, failed ? 'error' : incomplete ? 'warning' : 'success');
     }
     const activeMarketResearch = new Map();
     function updateMarketResearch(dealId, message) {
@@ -641,7 +641,7 @@
               .update({market_deep_dive:researchData.report}).eq('id',dealId);
             if(saveError) throw saveError;
             showStatus('Deep Dive abgeschlossen: Recherchehinweise gespeichert, noch nicht verifiziert.',false);
-            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert (nicht verifiziert).');
+            finishAlbertActivity('deep-' + dealId, 'Deep Dive', 'Recherchehinweise gespeichert, noch nicht verifiziert.', false, true);
           } catch(researchError) {
             showStatus('Deep Dive noch nicht abgeschlossen: '+researchError.message,true);
             finishAlbertActivity('deep-' + dealId, 'Deep Dive', researchError.message, true);
