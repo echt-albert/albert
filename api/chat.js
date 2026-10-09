@@ -660,6 +660,37 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  // Phase 1: ausdruecklicher Pipeline-Aufruf; normaler Chat bleibt unveraendert.
+  // Aktivierung erst nach End-to-End-Test im geschuetzten Branch.
+  if (mode === "pipeline") {
+    const lastUserMessage = [...valid].reverse().find(m => m.role === "user");
+    const query = lastUserMessage?.content?.trim();
+    if (!query) return res.status(400).json({ error: "Rechercheauftrag fehlt." });
+
+    try {
+      const pipeline = await Albert.run({ query });
+      if (!pipeline.success) {
+        return res.status(502).json({
+          error: "Brain-Pipeline fehlgeschlagen.",
+          failedDivision: pipeline.failedDivision,
+          executionLog: pipeline.executionLog
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        mode: "pipeline",
+        pipeline,
+        choices: [{ index: 0, message: {
+          role: "assistant",
+          content: "Die fünf Brains haben den Auftrag verarbeitet. Die strukturierten Ergebnisse stehen im Feld pipeline."
+        }, finish_reason: "stop" }]
+      });
+    } catch (error) {
+      console.error("[ALBERT] Pipeline-Fehler:", error);
+      return res.status(500).json({ error: "Die Brain-Pipeline konnte nicht ausgeführt werden." });
+    }
+  }
+
   const analysisMode = mode === "analyse";
 
   const controller = new AbortController();
