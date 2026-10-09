@@ -632,7 +632,7 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const { messages, mode = "chat" } = req.body || {};
+  const { messages, mode = "chat", researchProduct } = req.body || {};
 
   if (!Array.isArray(messages) || !messages.length) {
     return res.status(400).json({
@@ -665,7 +665,7 @@ module.exports = async function handler(req, res) {
   if (mode === "pipeline" || (mode !== "chat_only" && researchIntent)) {
     if (!query) return res.status(400).json({ error: "Rechercheauftrag fehlt." });
     try {
-      const pipeline = await Albert.run({ query });
+      const pipeline = await Albert.run({ query, ...(researchProduct && typeof researchProduct === "object" ? { product: researchProduct } : {}) });
       if (!pipeline.success) {
         return res.status(502).json({
           error: "Brain-Pipeline fehlgeschlagen: " + (pipeline.executionLog?.find(step => step.status === "failed")?.error || "Unbekannter Fehler"),
