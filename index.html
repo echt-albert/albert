@@ -794,6 +794,38 @@
       const keyClose = event => { if (event.key === 'Escape') close({target:modal.querySelector('[data-result-close]')}); };
       modal.addEventListener('click', close); document.addEventListener('keydown', keyClose);
     }
+    const activeOracleSearch = new Set();
+    async function searchOraclePrices(dealId) {
+      const id=String(dealId);
+      if(activeOracleSearch.has(id))return;
+      const deal=window.albertDealsById?.get(id);
+      if(!deal){showStatus('Deal nicht gefunden.',true);return;}
+      activeOracleSearch.add(id);
+      setAlbertActivity('oracle-'+id,'ORACLE · '+(deal.product_name||'B2C-Preise'),'Recherchiert Händlerangebote …');
+      await fetchDeals();
+      try{
+        const response=await fetch(SUPABASE_URL+'/functions/v1/albert-market',{
+          method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
+          body:JSON.stringify({product:deal})
+        });
+        const data=await response.json();
+        if(!response.ok||!data.success)throw Error(data.error||'ORACLE-Recherche fehlgeschlagen.');
+        const {error}=await supabaseClient.from('discoveries').update({market_deep_dive:data.report}).eq('id',dealId);
+        if(error)throw error;
+        const count=(data.report?.shopping_results||[]).filter(row=>row.merchant&&safeUrl(row.url)&&row.display_price).slice(0,3).length;
+        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+' gespeichert.',false,count===0);
+      }catch(e){
+        finishAlbertActivity('oracle-'+id,'ORACLE',e.message||String(e),true);
+        showStatus('ORACLE: '+(e.message||e),true);
+      }finally{
+        activeOracleSearch.delete(id);
+        await fetchDeals();
+      }
+    }
+    document.getElementById('deals-container').addEventListener('click',event=>{
+      const button=event.target.closest('[data-oracle-search]');
+      if(button){event.stopPropagation();searchOraclePrices(button.dataset.oracleSearch);}
+    });
     const activeMarketResearch = new Map();
     function updateMarketResearch(dealId, message) {
       activeMarketResearch.set(String(dealId), message);
@@ -1674,36 +1706,23 @@
 
                 </div>
 
-                <div class="space-y-1.5 text-xs">
-
-                  <span class="text-[10px] text-slate-400 block mb-1">
-                    Referenzen
-                  </span>
-
-                  ${
-                    marketPrices.length > 0
-                      ? marketPrices.map((price, idx) => `
-
-                        <div class="flex justify-between mono text-[11px] text-slate-600">
-
-                          <span class="text-cyan-700">
-                            #${idx + 1}
-                          </span>
-
-                          <span>
-                            ${price.toFixed(2)} €
-                          </span>
-
-                        </div>
-
-                      `).join('')
-                      : `
-                        <span class="text-slate-400 italic text-[11px]">
-                          Keine Daten
-                        </span>
-                      `
-                  }
-
+                <div class="space-y-2 text-xs">
+                  <span class="text-[10px] text-slate-400 block mb-1">Deutsche B2C-Angebote · inkl. Versand, soweit belegt</span>
+                  ${Array.from({length:3},(_,idx)=>{
+                    const offers=Array.isArray(deal.market_deep_dive?.shopping_results) ? deal.market_deep_dive.shopping_results : [];
+                    const found=offers.filter(row=>row.merchant && safeUrl(row.url) && row.display_price).slice(0,3);
+                    const offer=found[idx];
+                    if(!offer)return '<div class="flex justify-between mono text-[11px] text-slate-400"><span>#'+(idx+1)+' &nbsp; –</span><span>–</span></div>';
+                    const shipping=String(offer.display_shipping||'').trim();
+                    const price=String(offer.display_price||'').trim();
+                    const verified=offer.total_price_verified===true && Number(offer.total_price)>0;
+                    const total=verified ? Number(offer.total_price).toFixed(2)+' €' : price + (shipping ? ' + Versand '+shipping : ' · Versand offen');
+                    return '<div class="flex justify-between items-start gap-2 mono text-[11px]"><span class="text-cyan-700">#'+(idx+1)+' <a href="'+safeUrl(offer.url)+'" target="_blank" rel="noopener noreferrer" class="underline hover:text-cyan-900">'+escapeHtml(offer.merchant)+' ↗</a></span><span class="text-right text-slate-700">'+escapeHtml(total)+'</span></div>';
+                  }).join('')}
+                  ${deal.market_deep_dive?.checked_at ? '<p class="text-[10px] text-amber-700">Suchtreffer, noch nicht unabhängig verifiziert · '+escapeHtml(new Date(deal.market_deep_dive.checked_at).toLocaleDateString('de-DE'))+'</p>' : '<p class="text-[10px] text-slate-400">Noch keine gezielte Händlerrecherche.</p>'}
+                  <button type="button" data-oracle-search="${deal.id}" ${activeOracleSearch.has(String(deal.id))?'disabled':''} class="mt-2 w-full rounded-lg border border-cyan-200 bg-white px-2 py-2 text-[11px] font-semibold text-cyan-800 hover:bg-cyan-50 disabled:opacity-50">
+                    ${activeOracleSearch.has(String(deal.id))?'◌ ORACLE sucht …':deal.market_deep_dive?.checked_at?'↻ Preise aktualisieren':'▶ Preise suchen'}
+                  </button>
                 </div>
 
               </div>
