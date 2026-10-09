@@ -12,6 +12,10 @@ const RADAR = {
   async execute(input = {}) {
     console.log("[RADAR] Starte Live-Recherche");
 
+    if (input.product && typeof input.product === "object") {
+      return { radar_status: "RESEARCH_HANDOFF", radar_verified: false, product: input.product };
+    }
+
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
