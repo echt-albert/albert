@@ -736,22 +736,59 @@
     }
     let categoryLabels = new Map();
     let knownCategories = new Set();
-    async function saveDealCategory(dealId) {
-      const input = document.getElementById('category-input-' + dealId);
-      if (!input) return;
-      const category = input.value.trim().replace(/\s+/g, ' ');
-      if (category.length < 2 || category.length > 60) return alert('Kategorie: 2 bis 60 Zeichen.');
+    const categoryEditor = document.createElement('div');
+    categoryEditor.id = 'albert-category-editor';
+    categoryEditor.className = 'fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/30 p-4';
+    categoryEditor.innerHTML = '<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-200" role="dialog" aria-modal="true" aria-label="Deal-Kategorie bearbeiten"><div class="flex items-center justify-between mb-4"><h3 class="font-semibold text-slate-900 text-sm">Kategorie festlegen</h3><button type="button" id="category-close" class="text-slate-400 hover:text-slate-800 text-xl" aria-label="Schließen">×</button></div><p id="category-product" class="text-xs text-slate-500 mb-3 line-clamp-2"></p><label for="category-edit-input" class="block text-[11px] text-slate-600 mb-1.5">Vorhandene Kategorie wählen oder neue eingeben</label><input id="category-edit-input" list="category-edit-options" maxlength="60" autocomplete="off" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/><datalist id="category-edit-options"></datalist><p id="category-edit-error" class="hidden text-xs text-rose-600 mt-2"></p><div class="flex gap-2 mt-4"><button id="category-cancel" class="flex-1 border border-slate-200 rounded-lg py-2 text-xs text-slate-600">Abbrechen</button><button id="category-save" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-950 font-semibold rounded-lg py-2 text-xs">Speichern</button></div></div>';
+    document.body.appendChild(categoryEditor);
+    let editingCategoryDealId = null;
+    function closeCategoryEditor() { categoryEditor.classList.add('hidden'); categoryEditor.classList.remove('flex'); editingCategoryDealId = null; }
+    function openCategoryEditor(dealId) {
       const deal = window.albertDealsById?.get(String(dealId));
       if (!deal) return;
-      const { error } = await supabaseClient.from('deal_category_labels').upsert({
-        discovery_id: dealId, category, original_category: deal.category || null,
-        product_name: deal.product_name || null, updated_at: new Date().toISOString()
-      }, { onConflict: 'discovery_id' });
-      if (error) return alert('Speichern fehlgeschlagen: ' + error.message);
-      categoryLabels.set(String(dealId), category);
-      knownCategories.add(category);
-      fetchDeals();
+      editingCategoryDealId = String(dealId);
+      const names = new Set([...knownCategories, 'Haushalt & Wohnen', 'Technik & Elektronik', 'Freizeit & Familie', 'Büro & Gewerbe', 'Pflege & Verbrauch', 'Sonstiges']);
+      document.getElementById('category-edit-options').innerHTML = [...names].sort((a,b) => a.localeCompare(b,'de')).map(name => '<option value="' + escapeHtml(name) + '"></option>').join('');
+      document.getElementById('category-product').textContent = deal.product_name || 'Deal';
+      document.getElementById('category-edit-input').value = categoryName(deal);
+      document.getElementById('category-edit-error').classList.add('hidden');
+      categoryEditor.classList.remove('hidden'); categoryEditor.classList.add('flex');
+      document.getElementById('category-edit-input').focus();
     }
+    async function saveDealCategory() {
+      const dealId = editingCategoryDealId;
+      const input = document.getElementById('category-edit-input');
+      const errorEl = document.getElementById('category-edit-error');
+      if (!dealId) return;
+      let category = input.value.trim().replace(/\\s+/g, ' ');
+      const existing = [...knownCategories].find(name => name.toLocaleLowerCase('de') === category.toLocaleLowerCase('de'));
+      if (existing) category = existing;
+      if (category.length < 2 || category.length > 60) {
+        errorEl.textContent = 'Bitte 2 bis 60 Zeichen eingeben.'; errorEl.classList.remove('hidden'); return;
+      }
+      const deal = window.albertDealsById?.get(dealId);
+      if (!deal) return;
+      const saveBtn = document.getElementById('category-save');
+      saveBtn.disabled = true; saveBtn.textContent = 'Speichert …';
+      try {
+        const { error } = await supabaseClient.from('deal_category_labels').upsert({
+          discovery_id: dealId, category, original_category: deal.category || null,
+          product_name: deal.product_name || null, updated_at: new Date().toISOString()
+        }, { onConflict: 'discovery_id' });
+        if (error) throw error;
+        categoryLabels.set(dealId, category); knownCategories.add(category);
+        closeCategoryEditor();
+        await fetchDeals();
+      } catch (error) {
+        errorEl.textContent = 'Speichern fehlgeschlagen: ' + error.message; errorEl.classList.remove('hidden');
+      } finally { saveBtn.disabled = false; saveBtn.textContent = 'Speichern'; }
+    }
+    document.getElementById('category-close').addEventListener('click', closeCategoryEditor);
+    document.getElementById('category-cancel').addEventListener('click', closeCategoryEditor);
+    document.getElementById('category-save').addEventListener('click', saveDealCategory);
+    document.getElementById('category-edit-input').addEventListener('keydown', event => { if (event.key === 'Enter') saveDealCategory(); });
+    categoryEditor.addEventListener('click', event => { if (event.target === categoryEditor) closeCategoryEditor(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && editingCategoryDealId) closeCategoryEditor(); });
     document.getElementById('category-filters').addEventListener('click', event => {
       const button = event.target.closest('button[data-category]');
       if (!button) return;
@@ -977,14 +1014,7 @@
                   <span class="text-[10px] font-medium uppercase tracking-wider text-cyan-700 mono bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">
                     ${escapeHtml(categoryName(deal))}
                   </span>
-                  <details class="relative text-[11px]">
-                    <summary class="cursor-pointer list-none text-slate-500 hover:text-amber-800 px-1.5 py-0.5" title="Kategorie ändern">✎ Kategorie</summary>
-                    <div class="absolute z-30 top-7 left-0 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl" onclick="event.stopPropagation()">
-                      <label class="block text-[10px] uppercase tracking-wide text-slate-500 mb-2">Wählen oder neu eingeben</label>
-                      <input id="category-input-${dealId}" list="albert-category-suggestions" value="${escapeHtml(categoryName(deal))}" maxlength="60" class="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:border-amber-400" />
-                      <button type="button" onclick="saveDealCategory('${dealId}')" class="mt-2 w-full rounded-lg bg-amber-50 border border-amber-200 text-amber-900 py-2 font-semibold hover:bg-amber-100">Speichern</button>
-                    </div>
-                  </details>
+                  <button type="button" onclick="openCategoryEditor('${dealId}')" class="text-[10px] text-slate-500 hover:text-amber-800 px-1.5 py-0.5 rounded hover:bg-amber-50" title="Kategorie ändern oder neu erstellen">✎ Kategorie</button>
                   <span class="text-[10px] font-medium uppercase tracking-wider mono px-2 py-0.5 rounded border ${deal.hunt_origin === 'SOFORT' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-100 border-slate-200'}">
                     ${deal.hunt_origin === 'SOFORT' ? '⚡ Sofort-Jagd' : '↻ Permanente Jagd'}
                   </span>
