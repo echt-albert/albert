@@ -178,7 +178,10 @@
 .deal-division-link[aria-current="true"]{border-color:#f59e0b;background:#fffbeb}
 .deal-compact>.deal-division-nav{display:grid!important}
 .deal-compact .deal-header{margin-bottom:0!important}
-.deal-compact .deal-header .deal-header-actions{display:none!important}
+.deal-compact .deal-header .deal-header-actions{display:flex!important;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.deal-header-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.deal-header-actions button[aria-label="Deal bewerten"]{display:inline-flex!important;visibility:visible!important;white-space:nowrap}
+@media(max-width:640px){.deal-compact .deal-header{grid-template-columns:minmax(0,1fr)}.deal-compact .deal-header-actions{grid-column:1;grid-row:3;justify-content:flex-start}}
 .deal-compact .deal-header .deal-header-status{margin:0!important;justify-content:flex-start!important;width:auto!important}
 .deal-compact .deal-decision-overview,.deal-compact .deal-status-guidance,.deal-compact .deal-b2c-market,.deal-compact .deal-compact-summary{display:none!important}
 .deal-compact>.deal-division-nav{margin-bottom:0}
