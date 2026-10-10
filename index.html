@@ -1551,6 +1551,38 @@
       try { localStorage.setItem(returnScenarioKey(id), JSON.stringify(values)); } catch (_) {}
       updateReturnScenario(section);
     });
+    // Revisionen werden nur mit einer authentifizierten Supabase-Sitzung gespeichert.
+    // Ohne Anmeldung bleibt die bestehende lokale Browser-Speicherung maßgeblich.
+    const assumptionSaveTimers = new Map();
+    async function saveAuthenticatedReturnAssumptions(section) {
+      const id = Number(section.dataset.returnScenario);
+      const rateRaw = section.querySelector('[data-return-field="rate"]').value;
+      const costRaw = section.querySelector('[data-return-field="cost"]').value;
+      const status = section.querySelector('[data-return-save-status]');
+      if (!Number.isSafeInteger(id) || id <= 0 || rateRaw === '' || costRaw === '') return;
+      const rate = Number(rateRaw), cost = Number(costRaw);
+      if (!Number.isFinite(rate) || rate < 0 || rate > 100 || !Number.isFinite(cost) || cost < 0) return;
+      const {data:{user},error:authError} = await supabaseClient.auth.getUser();
+      if (authError || !user) {
+        if (status) status.textContent = 'Nur lokal gespeichert · für dauerhafte Speicherung ist eine Anmeldung erforderlich.';
+        return;
+      }
+      const rows = [
+        {discovery_id:id,user_id:user.id,field_name:'return_rate_pct',buyer_value:rate},
+        {discovery_id:id,user_id:user.id,field_name:'return_cost_eur',buyer_value:cost}
+      ];
+      const {error} = await supabaseClient.from('buyer_assumption_revisions').insert(rows);
+      if (status) status.textContent = error ? 'Nur lokal gespeichert · Serverfehler: '+error.message : 'Als neue Einkäuferrevisionen sicher gespeichert.';
+    }
+    document.getElementById('deals-container').addEventListener('change', event => {
+      const input = event.target.closest('[data-return-field]');
+      if (!input) return;
+      const section = input.closest('[data-return-scenario]');
+      if (!section) return;
+      const id = section.dataset.returnScenario;
+      clearTimeout(assumptionSaveTimers.get(id));
+      assumptionSaveTimers.set(id,setTimeout(() => saveAuthenticatedReturnAssumptions(section),400));
+    });
     function updateReturnScenario(section) {
       const rateRaw = section.querySelector('[data-return-field="rate"]').value;
       const costRaw = section.querySelector('[data-return-field="cost"]').value;
@@ -2210,6 +2242,7 @@
                   <label>Retourenquote %<input type="number" min="0" max="100" step="0.5" inputmode="decimal" data-return-field="rate" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 8"></label>
                   <label>Kosten je Retoure €<input type="number" min="0" step="0.01" inputmode="decimal" data-return-field="cost" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 12"></label>
                 </div>
+                <p class="mt-2 text-[10px] text-slate-500" data-return-save-status>Browser-Speicherung aktiv · Server-Speicherung nur nach Anmeldung und Eingabeabschluss.</p>
                 <div class="mt-2 text-slate-700" data-return-result>Beide Werte eingeben, um erwartete Retourenkosten zu berechnen.</div>
               </details>
               <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
