@@ -413,6 +413,15 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .deal-accordion-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;color:#1f2937!important}
     .deal-workspace .deal-accordion-icon svg{width:19px;height:19px;display:block}
 
+    /* Aufgeklappte Werkzeuge: doppelte Rubrikzeile (Punkt + Titel) ausblenden.
+       Die Accordion-Kopfzeile bleibt sichtbar; sämtliche eigentlichen Inhalte bleiben erhalten. */
+    .deal-workspace .deal-accordion-body>[data-division-section="radar"]>div:first-child>.flex.items-center.gap-2.mb-3,
+    .deal-workspace .deal-accordion-body>[data-division-section="cipher"]>.flex.items-center.gap-2.mb-3,
+    .deal-workspace .deal-accordion-body>[data-division-section="oracle"]>.flex.items-center.gap-2.mb-3,
+    .deal-workspace .deal-accordion-body>[data-division-section="portrait"]>.flex.items-center.gap-2.mb-3,
+    .deal-workspace .deal-accordion-body>[data-division-section="audience"]>.flex.items-center.gap-2.mb-3{display:none!important}
+    .deal-workspace .deal-accordion-body .albert-unified-analysis>.flex.items-center.gap-2.mb-3{display:none!important}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
