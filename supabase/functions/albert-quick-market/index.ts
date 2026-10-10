@@ -39,7 +39,7 @@ Deno.serve(async req=>{
  const hits=words.filter((w:string)=>title.includes(w)).length;
  const match=Boolean((ean&&title.includes(ean.toLowerCase()))||(mpn&&title.includes(mpn.toLowerCase()))||(words.length>0&&hits>=Math.min(2,words.length)&&(!brand||title.includes(brand.toLowerCase()))));
  if(!match)continue;
- const raw=String(hit.price||"").replace(/[^0-9,.]/g,"");const price=Number(raw.replaceAll(".","").replace(",","."));
+ const raw=String(hit.price||"").replace(/[^0-9,.]/g,"");const comma=raw.lastIndexOf(","),dot=raw.lastIndexOf(".");const normalized=comma>dot?raw.replaceAll(".","").replace(",","."):dot>comma?raw.replaceAll(",",""):raw.replace(",",".");const price=Number(normalized);
  let link=null;try{const u=new URL(hit.link||hit.productLink);if(u.protocol==="https:")link=u.href}catch{}
  if(link&&price>0&&price<100000)matches.push({price,link,merchant:clean(hit.source||hit.merchant||new URL(link).hostname)});
  }
