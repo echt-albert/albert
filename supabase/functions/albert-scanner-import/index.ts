@@ -35,9 +35,14 @@ Deno.serve(async req=>{
   const {data,error}=await db.rpc("scanner_insert_deal",{p_source_key:sourceKey,p_filename:filename,p_line:line,p_user:user.id,p_product:product,p_brand:brand,p_ean:ean,p_mpn:mpn,p_quantity:qty,p_price:price,p_supplier:supplier});
   if(error){errors.push({line,error:"Speichern fehlgeschlagen"});continue;}
   if(data?.[0]?.created)created++;else skipped++;
+  // Originalquelle separat vom unverifizierten Testdatenblock als Angebotslink speichern.
+  const dealId=data?.[0]?.deal_id??data?.[0]?.id??null;
+  const candidate=str(row.offer_url||testValues?.quelle||testValues?.quellenlink,2000);
+  let verifiedUrl="";
+  try{const u=new URL(candidate);if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)verifiedUrl=u.toString();}catch{/* Missing or invalid URL stays empty */}
+  if(dealId&&verifiedUrl){const {error:linkError}=await db.from("discoveries").update({offer_url:verifiedUrl}).eq("id",dealId);if(linkError)errors.push({line,error:"Quelllink konnte nicht gespeichert werden"});}
   // Testdaten separat halten: niemals als verifizierte Marktpreise speichern.
   if(testValues&&Object.values(testValues).some(v=>String(v??"").trim())){
-   const dealId=data?.[0]?.deal_id??data?.[0]?.id??null;
    if(!dealId){errors.push({line,error:"Deal gespeichert, aber ID für Testdaten fehlt (RPC-Rückgabe prüfen)"});continue;}
    const safe=Object.fromEntries(Object.entries(testValues).slice(0,30).map(([k,v])=>[str(k,80),str(v,300)]));
    const {error:extraError}=await db.from("scanner_test_values").upsert({discovery_id:dealId,values_json:safe},{onConflict:"discovery_id"});
