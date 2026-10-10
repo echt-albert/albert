@@ -861,6 +861,34 @@
       const button=event.target.closest('[data-cipher-search]');
       if(button){event.stopPropagation();searchCipherIdentity(button.dataset.cipherSearch);}
     });
+    document.getElementById('deals-container').addEventListener('click',async event=>{
+      const button=event.target.closest('[data-quantum-calc]');
+      if(!button)return;
+      event.stopPropagation();
+      const id=String(button.dataset.quantumCalc);
+      const deal=window.albertDealsById?.get(id);
+      if(!deal)return;
+      const verified=Number(deal.market_deep_dive?.verified_lowest_total_price);
+      const quantity=Number(deal.quantity);
+      if(!Number.isFinite(verified)||verified<=0){
+        showStatus('QUANTUM: Zuerst benötigt ORACLE einen verifizierten deutschen B2C-Gesamtpreis inklusive Versand. Suchtreffer allein reichen nicht.',true);
+        return;
+      }
+      if(!Number.isFinite(quantity)||quantity<=0){
+        showStatus('QUANTUM: Die Postenmenge fehlt. Keine verlässliche Stückkalkulation möglich.',true);
+        return;
+      }
+      const vk=Math.round(verified*.8*100)/100;
+      const marketing=Math.round(vk*.2*100)/100;
+      const report={checked_at:new Date().toISOString(),market_total_price:verified,conservative_vk:vk,marketing,max_ek_before_other_costs:Math.round((vk-marketing)*100)/100,status:'PARTIAL_COSTS_MISSING',note:'Obergrenze vor Einkaufstransport, Endkundenversand, Gebühren, Steuern, Retouren und weiteren Kosten; keine Kaufempfehlung.'};
+      button.disabled=true;
+      try{
+        const {error}=await supabaseClient.from('discoveries').update({quantum_calculation:report}).eq('id',id);
+        if(error)throw error;
+        showStatus('QUANTUM: Teilrechnung gespeichert. Für einen echten MAX-EK fehlen noch weitere Kosten.');
+      }catch(e){showStatus('QUANTUM: '+(e.message||e),true);}
+      finally{button.disabled=false;await fetchDeals();}
+    });
     const activeOracleSearch = new Set();
     async function searchOraclePrices(dealId) {
       const id=String(dealId);
@@ -1893,91 +1921,23 @@
 
 
               <!-- QUANTUM -->
-
               <div style="--accent:#d97706" class="division-workcard rounded-xl">
-
-                <div class="flex items-center gap-2 mb-3">
-
+                <div class="flex items-center gap-2">
                   <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-900 mono">
-                    04 · QUANTUM
-                  </span>
-
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-900 mono">04 · QUANTUM</span>
                 </div>
-
-                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">Vorläufiger Rohvergleich · keine Vollkostenrechnung</p></div>
-                <div class="space-y-2 text-xs">
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      Ø Markt
-                    </span>
-
-                    <span class="mono text-[#1d1d1f]">
-                      ${avgMarket > 0
-                        ? avgMarket.toFixed(2) + ' €'
-                        : '—'}
-                    </span>
-
-                  </div>
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      Differenz
-                    </span>
-
-                    <span class="mono ${
-                      absoluteMargin !== null && absoluteMargin >= 0
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
-                    } font-medium">
-
-                      ${
-                        absoluteMargin !== null
-                          ? (absoluteMargin >= 0 ? '+' : '') +
-                            absoluteMargin.toFixed(2) + ' €'
-                          : '—'
-                      }
-
-                    </span>
-
-                  </div>
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      Spanne
-                    </span>
-
-                    <span class="mono ${
-                      percentageMargin !== null && percentageMargin >= 0
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
-                    } font-medium">
-
-                      ${
-                        percentageMargin !== null
-                          ? (percentageMargin >= 0 ? '+' : '') +
-                            percentageMargin.toFixed(1) + '%'
-                          : '—'
-                      }
-
-                    </span>
-
-                  </div>
-
+                <div>
+                  <h3 class="division-title">Lohnt sich dieser Posten?</h3>
+                  <p class="division-subtitle">Wirtschaftlichkeitsprüfung</p>
                 </div>
-
-                <p class="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                  Rohvergleich vor Versand, Marketing und weiteren Kosten.
-                </p>
-
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">Wirtschaftlichkeit im Detail ansehen ↗</button>
+                <div class="text-xs text-slate-700 space-y-2">
+                  <p><span class="font-semibold">Status:</span> ${deal.quantum_calculation?.checked_at ? 'Berechnung vorhanden' : 'Noch nicht berechnet'}</p>
+                  ${deal.quantum_calculation?.checked_at
+                    ? '<p><strong>Konservativer VK:</strong> '+escapeHtml(Number(deal.quantum_calculation.conservative_vk).toFixed(2))+' € / Stück</p><p><strong>Marketing (20 %):</strong> '+escapeHtml(Number(deal.quantum_calculation.marketing).toFixed(2))+' € / Stück</p><p><strong>MAX-EK vor weiteren Kosten:</strong> '+escapeHtml(Number(deal.quantum_calculation.max_ek_before_other_costs).toFixed(2))+' € / Stück</p><p class="text-amber-800">Noch keine Vollkostenrechnung. Versand, Gebühren und weitere Kosten fehlen.</p>'
+                    : '<p class="text-slate-500">Wirtschaftlichkeit offen</p>'}
+                </div>
+                <button type="button" data-quantum-calc="${deal.id}" class="division-action">${deal.quantum_calculation?.checked_at ? '↻ Neu berechnen' : 'Wirtschaftlichkeit berechnen ↗'}</button>
               </div>
-
 
               <!-- VERDICT -->
 
