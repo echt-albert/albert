@@ -2461,7 +2461,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                 ['oracle','03','Analyse','Markt & Wirtschaftlichkeit',Boolean(oracleReport(deal)?.checked_at)],
                 ['portrait','06','Produkt','Porträt',Boolean(deal.product_portrait)],
                 ['audience','07','Käufer','Zielgruppe',Boolean(deal.target_audience)]
-              ].map(([key,n,label,description,done])=>'<button type="button" class="deal-division-link" data-deal-division="'+key+'" data-deal-id="'+dealId+'" aria-label="'+n+' '+label+' öffnen"><span class="deal-division-index">'+n+' · '+(done?'●':'○')+'</span><strong>'+label+'</strong><small>'+description+'</small></button>').join('')}
+              ].map(([key,n,label,description,done])=>'<button type="button" class="deal-division-link" aria-current="'+(key==='radar'?'true':'false')+'" data-deal-division="'+key+'" data-deal-id="'+dealId+'" aria-label="'+n+' '+label+' öffnen"><span class="deal-division-index">'+n+' · '+(done?'●':'○')+'</span><strong>'+label+'</strong><small>'+description+'</small></button>').join('')}
             </nav>
 
             <!-- KOMPAKTE ENTSCHEIDUNGSANSICHT: keine redundanten Statusboxen -->
@@ -2526,7 +2526,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
               <!-- RADAR -->
 
-              <div data-division-section="radar" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
+              <div data-division-section="radar" tabindex="-1" class="deal-workspace-active deal-division-section division-workcard division-unified rounded-xl">
 
                 <div>
 
