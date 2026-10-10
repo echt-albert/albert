@@ -1547,6 +1547,7 @@
       const section = input.closest('[data-return-scenario]');
       if (!section) return;
       const id = section.dataset.returnScenario;
+      section.dataset.edited = 'yes';
       const values = Object.fromEntries([...section.querySelectorAll('[data-return-field]')].map(el => [el.dataset.returnField, el.value]));
       try { localStorage.setItem(returnScenarioKey(id), JSON.stringify(values)); } catch (_) {}
       updateReturnScenario(section);
@@ -1656,7 +1657,48 @@
         }
       } catch (_) {}
       updateReturnScenario(section);
+      // Eigene, authentifizierte Revisionen haben Vorrang vor lokalen Browser-Werten.
+      void loadAuthenticatedReturnAssumptions(section);
     }, true);
+    async function loadAuthenticatedReturnAssumptions(section) {
+      const status = section.querySelector('[data-return-save-status]');
+      const id = Number(section.dataset.returnScenario);
+      if (!Number.isSafeInteger(id) || id <= 0) return;
+      try {
+        const {data:{user},error:authError} = await supabaseClient.auth.getUser();
+        if (authError || !user) {
+          if (status) status.textContent = 'Nur lokal gespeichert · keine angemeldete Sitzung.';
+          return;
+        }
+        const {data,error} = await supabaseClient.from('buyer_assumption_revisions')
+          .select('field_name,buyer_value,created_at')
+          .eq('discovery_id',id)
+          .in('field_name',['return_rate_pct','return_cost_eur'])
+          .order('created_at',{ascending:false})
+          .limit(100);
+        if (error) {
+          if (status) status.textContent = 'Serverwerte nicht geladen · lokale Eingaben bleiben erhalten.';
+          return;
+        }
+        const latest = new Map();
+        for (const row of data || []) if (!latest.has(row.field_name)) latest.set(row.field_name,row.buyer_value);
+        if (latest.size === 0) {
+          if (status) status.textContent = 'Angemeldet · noch keine gespeicherten Retourenrevisionen für diesen Posten.';
+          return;
+        }
+        // Keine neuen Eingaben überschreiben, die während des asynchronen Ladens gemacht wurden.
+        if (!section.isConnected || section.dataset.edited === 'yes') return;
+        for (const [name,field] of [['return_rate_pct','rate'],['return_cost_eur','cost']]) {
+          if (latest.has(name)) section.querySelector('[data-return-field="'+field+'"]').value = latest.get(name);
+        }
+        const values = Object.fromEntries([...section.querySelectorAll('[data-return-field]')].map(el => [el.dataset.returnField, el.value]));
+        try { localStorage.setItem(returnScenarioKey(id),JSON.stringify(values)); } catch (_) {}
+        updateReturnScenario(section);
+        if (status) status.textContent = 'Letzte eigene Einkäuferrevisionen aus der Datenbank geladen.';
+      } catch (_) {
+        if (status) status.textContent = 'Serverwerte nicht geladen · lokale Eingaben bleiben erhalten.';
+      }
+    }
     async function fetchDeals() {
 
       const container =
