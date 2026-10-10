@@ -32,6 +32,46 @@ function candidatesFrom(raw: string): Candidate[] {
     : value?.offer_url ? [value] : [];
   return arr.filter(x => x && typeof x === "object").slice(0, 5);
 }
+
+// Buyer feedback is advisory discovery context, never a product rating or exclusion rule.
+// Read only a bounded number of recent decisions; do not send buyer free-text to Gemini.
+async function buyerDiscoveryMemory(db: any): Promise<string> {
+  const { data, error } = await db.from("deal_feedback")
+    .select("discovery_id,action,comment,id").order("id", { ascending: false }).limit(120);
+  if (error || !data?.length) return "";
+  // The latest decision per deal wins; repeated clicks must not amplify preferences.
+  const latest = new Map<string, { action: string; comment: string }>();
+  for (const row of data) {
+    const id = String(row.discovery_id ?? "");
+    if (!id || latest.has(id)) continue;
+    latest.set(id, { action: text(row.action), comment: text(row.comment) });
+  }
+  const reasons = new Map<string, number>();
+  const actions = new Map<string, number>();
+  const allowed = new Set([
+    "Interessante Produktkategorie", "Attraktive Einkaufsquelle", "Gute Marge / Preisabweichung",
+    "Besonderes Risiko", "Grundsätzliche Einkaufsregel", "Einkaufspreis zu hoch",
+    "Marge zu gering", "Nachfrage zu schwach", "Kapitalbindung zu hoch",
+    "Versand / Retouren", "Compliance / Produktproblem", "Preis könnte noch fallen",
+    "Nachfrage noch nicht belegt", "Weitere Marktprüfung nötig", "Lieferantenangebot abwarten"
+  ]);
+  for (const row of latest.values()) {
+    if (!["LEARN", "REJECT", "WATCH", "DEEP_DIVE"].includes(row.action)) continue;
+    actions.set(row.action, (actions.get(row.action) ?? 0) + 1);
+    const reason = row.comment.match(/^\\[Grund: ([^\\]]{1,80})\\]/)?.[1];
+    if (reason && allowed.has(reason)) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+  }
+  if (!actions.size) return "";
+  const top = [...reasons.entries()].sort((a,b) => b[1]-a[1]).slice(0, 6)
+    .map(([name,count]) => name + " (" + count + ")").join("; ");
+  return "BISHERIGE EINKÄUFER-RÜCKMELDUNGEN (nur aggregierte Hinweise, keine Regeln): " +
+    [...actions.entries()].map(([name,count]) => name + "=" + count).join(", ") +
+    (top ? ". Häufige Gründe: " + top : "") +
+    ". Nutze dies höchstens als Anregung für einzelne Suchrichtungen. " +
+    "Entdecke weiterhin verschiedene Quellen und mindestens zwei neue/unübliche Kategorien. " +
+    "Keine automatische Bewertung, Rangfolge, Ablehnung oder Ausfilterung aufgrund dieser Rückmeldungen.";
+}
+
 // URLs are syntactically checked, but not fetched from the server.
 // Server-side arbitrary URL fetches would create an SSRF risk.
 serve(async req => {
@@ -56,12 +96,14 @@ serve(async req => {
     const created = await db.from("research_runs").insert({ status: "running" }).select("id").single();
     if (created.error) throw created.error;
     runId = created.data.id;
+    const buyerMemory = await buyerDiscoveryMemory(db).catch(() => "");
     const ai = new GoogleGenAI({ apiKey: key });
     // One grounded model call; no unbounded retries or surprise cost multiplication.
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
       contents: `Du bist RADAR, ein erfahrener kategorieunabhängiger B2B-Schnäppchenjäger für den deutschen B2C-Handel.
 Auftrag: ${query}
+${buyerMemory}
 ZIEL: Entdecke 3–5 unterschiedliche KONKRETE, öffentlich auffindbare B2B-Warenangebote mit nachvollziehbarer URL. Suche nach Verkäuferdruck, nicht nur nach Produktnamen.
 SUCHE BREIT IN MEHREREN SUCHRICHTUNGEN:
 1. Lagerüberhang, Overstock, Sortimentswechsel, Auftragsstorno und Distributor-Abverkauf.
