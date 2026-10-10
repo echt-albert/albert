@@ -181,6 +181,12 @@
 .deal-compact .deal-header .deal-header-actions{display:flex!important;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .deal-header-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .deal-header-actions button[aria-label="Deal bewerten"]{display:inline-flex!important;visibility:visible!important;white-space:nowrap}
+/* Leichter, transparenter Aktionsbutton im Stil der Deal-Akte */
+.deal-evaluate-button{align-items:center;justify-content:center;gap:6px;padding:9px 15px;border-radius:13px;border:1px solid rgba(217,119,6,.25);background:rgba(255,251,235,.58);color:#92400e;font-size:12px;font-weight:600;letter-spacing:.005em;line-height:1.3;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.025);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.deal-evaluate-button:hover{background:rgba(254,243,199,.8);border-color:rgba(217,119,6,.45);box-shadow:0 3px 10px rgba(146,64,14,.06);transform:translateY(-1px)}
+.deal-evaluate-button:active{transform:translateY(0)}
+.deal-evaluate-button:focus-visible{outline:2px solid #d97706;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.deal-evaluate-button{transition:none}.deal-evaluate-button:hover{transform:none}}
 @media(max-width:640px){.deal-compact .deal-header{grid-template-columns:minmax(0,1fr)}.deal-compact .deal-header-actions{grid-column:1;grid-row:3;justify-content:flex-start}}
 .deal-compact .deal-header .deal-header-status{margin:0!important;justify-content:flex-start!important;width:auto!important}
 .deal-compact .deal-decision-overview,.deal-compact .deal-status-guidance,.deal-compact .deal-b2c-market,.deal-compact .deal-compact-summary{display:none!important}
@@ -1731,7 +1737,7 @@
                 </div>
 
                 ${`<button type="button" class="deal-expand bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-[11px] font-mono" onclick="toggleDealCard('${dealId}')" aria-expanded="${expanded}">${expanded ? 'Einklappen ↑' : 'Aufklappen ↓'}</button>`}
-                <button type="button" data-deal-id="${dealId}" onclick="openVerdictChoices('${dealId}')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-600 px-4 py-2 rounded-xl text-[12px] font-semibold transition-colors cursor-pointer shadow-sm" aria-label="Deal bewerten">
+                <button type="button" data-deal-id="${dealId}" onclick="openVerdictChoices('${dealId}')" class="deal-evaluate-button" aria-label="Deal bewerten">
                   Deal bewerten ↗
                 </button>
 
