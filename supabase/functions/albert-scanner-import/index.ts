@@ -25,7 +25,9 @@ Deno.serve(async req=>{
  let created=0,skipped=0;const errors=[];
  for(let i=0;i<body.rows.length;i++){
   const row=body.rows[i]||{},product=str(row.product_name),ean=str(row.ean_gtin,14),brand=str(row.brand,160),mpn=str(row.mpn,120);
-  const qty=quantity(row.quantity),rawPrice=decimal(row.purchase_price),line=Number(row.line);\n  const basis=str(row.price_basis,60).toLowerCase();\n  const price=rawPrice!==null&&(!basis||/^(stück|stueck|stk|einzelpreis|pro stück|pro stk|je stück|1 stück|piece|unit)$/.test(basis))?rawPrice:null;
+  const qty=quantity(row.quantity),rawPrice=decimal(row.purchase_price),line=Number(row.line);
+  const basis=str(row.price_basis,60).toLowerCase();
+  const price=rawPrice!==null&&(!basis||/^(stück|stueck|stk|einzelpreis|pro stück|pro stk|je stück|1 stück|piece|unit)$/.test(basis))?rawPrice:null;
   if(!product||!validEan(ean)||(!Number.isInteger(line)||line<2)|| (str(row.quantity)&&qty===null)||(str(row.purchase_price)&&price===null)){
    errors.push({line:row.line,error:"Unvollständige oder ungültige Produktdaten"});continue;
   }
