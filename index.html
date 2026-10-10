@@ -1054,6 +1054,7 @@
           await fetchDeals();
           return;
         }
+        if (dealQuantityBlocked(deal)) { showStatus("X · Keine Kaufempfehlung: Postenmenge fehlt oder Deal ausgeschlossen.", true); await fetchDeals(); return; }
         if (!deal.brain_analysis) {
           showStatus('✓ Entscheidung und Begründung gespeichert. Für diesen älteren Posten fehlt die Analyse vor VERDICT.', false);
           await fetchDeals();
@@ -1607,8 +1608,9 @@
           Number.isFinite(purchasePrice) &&
           purchasePrice > 0;
 
+        const quantityExcluded = dealQuantityBlocked(deal);
         const absoluteMargin =
-          avgMarket > 0 && hasPurchasePrice
+          !quantityExcluded && avgMarket > 0 && hasPurchasePrice
             ? avgMarket - purchasePrice
             : null;
 
@@ -1987,7 +1989,7 @@
 
                 </div>
 
-                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">Vorläufiger Rohvergleich · keine Vollkostenrechnung</p></div>
+                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">${quantityExcluded ? "X · Gesperrt: Menge fehlt oder Posten ausgeschlossen" : "Vorläufiger Rohvergleich · keine Vollkostenrechnung"}</p></div>
                 <div class="space-y-2 text-xs">
 
                   <div class="flex justify-between gap-2">
@@ -1998,7 +2000,7 @@
 
                     <span class="mono text-[#1d1d1f]">
                       ${avgMarket > 0
-                        ? avgMarket.toFixed(2) + ' €'
+                        && !quantityExcluded ? avgMarket.toFixed(2) + ' €'
                         : '—'}
                     </span>
 
@@ -2056,7 +2058,7 @@
                   Rohvergleich vor Versand, Marketing und weiteren Kosten.
                 </p>
 
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">Wirtschaftlichkeit im Detail ansehen ↗</button>
+              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>${quantityExcluded ? "X · Wirtschaftlichkeit gesperrt" : "Wirtschaftlichkeit im Detail ansehen ↗"}</button>
               </div>
 
 
@@ -2090,7 +2092,7 @@
 
                 </div>
 
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">Dein Urteil öffnen ↗</button>
+              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">${quantityExcluded ? "X · Nur Ablehnung / Dokumentation" : "Dein Urteil öffnen ↗"}</button>
               </div>
 
               <!-- BREITE KI-KACHELN: zwei Spalten statt schmalem Dreier-Grid -->
