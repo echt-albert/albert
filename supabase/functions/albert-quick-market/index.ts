@@ -19,13 +19,11 @@ Deno.serve(async req=>{
  const ck=cacheKey(product);
  const cached=await readCache(ck);
  const previous=cached?.quick_result;
- if(previous?.checked_at&&Date.now()-Date.parse(previous.checked_at)<86400000&&previous.success&&(previous.low_eur||previous.cheapest_price_eur))return reply({...previous,cache_hit:true});
+ if(previous?.checked_at&&Date.now()-Date.parse(previous.checked_at)<86400000&&previous.success&&previous.source!=="deep"&&(previous.low_eur||previous.cheapest_price_eur))return reply({...previous,cache_hit:true});
  const deep=cached?.deep_result;
- if(deep?.checked_at&&Date.now()-Date.parse(deep.checked_at)<86400000&&deep.report?.market_indication){
-   const offers=deep.report.shopping_results||[];
-   const cheapest=offers.filter((x:any)=>typeof x.indicative_article_price==="number").sort((a:any,b:any)=>a.indicative_article_price-b.indicative_article_price)[0];
-   const m=deep.report.market_indication;
-   return reply({success:true,low_eur:m.lowest_article_price,high_eur:m.highest_article_price,cheapest_price_eur:cheapest?.indicative_article_price||null,cheapest_merchant:cheapest?.merchant||null,cheapest_url:cheapest?.url||null,verified:false,cache_hit:true,source:"deep"});
+ if(deep?.checked_at&&Date.now()-Date.parse(deep.checked_at)<86400000){
+ const offers=(deep.report?.shopping_results||[]).filter((x:any)=>x.identity_match==="IDENTIFIER_IN_RESULT"&&Number(x.indicative_article_price)>0).sort((a:any,b:any)=>a.indicative_article_price-b.indicative_article_price);
+ if(offers.length){const first=offers[0];return reply({success:true,low_eur:first.indicative_article_price,high_eur:offers[offers.length-1].indicative_article_price,cheapest_price_eur:first.indicative_article_price,cheapest_merchant:first.merchant||null,cheapest_url:first.url||null,verified:false,cache_hit:true,source:"deep_matched"});}
  }
  const serper=Deno.env.get("SERPER_API_KEY");
  if(serper){
