@@ -149,6 +149,25 @@
 @media(max-width:520px) { .deal-overview-next { flex-direction:column; align-items:flex-start; } }
 
 .deal-divisions > .division-workcard{padding:18px;border:1px solid #dce4ed;border-top:3px solid var(--accent,#94a3b8);background:#fff;display:flex;flex-direction:column;gap:12px;min-width:0}.division-workcard .division-title{font-size:15px;font-weight:750;line-height:1.35;color:#1e293b}.division-workcard .division-subtitle{font-size:11px;color:#64748b;line-height:1.5;margin-top:4px}.division-workcard .division-action{display:block;margin-top:auto;padding:10px 12px;text-align:center;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;font-size:12px;font-weight:700;color:#334155;cursor:pointer}.division-workcard .division-action:hover{background:#f1f5f9}
+
+/* Deal-Akte: schlanker Kopf und sieben direkt anwählbare Abteilungen */
+.deal-division-nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:12px 0 16px}
+.deal-division-link{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:11px 9px;border:1px solid #e2e8f0;border-radius:11px;background:#fff;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
+.deal-division-link:hover,.deal-division-link:focus-visible{background:#fffbeb;border-color:#fbbf24;outline:none}
+.deal-division-link strong{font-size:11px;color:#1e293b;letter-spacing:.015em}
+.deal-division-link small{font-size:10px;color:#64748b;line-height:1.2}
+.deal-division-link .deal-division-index{font:700 10px ui-monospace,monospace;color:#a16207}
+.deal-division-link[aria-current="true"]{border-color:#f59e0b;background:#fffbeb}
+.deal-compact>.deal-division-nav{display:grid!important}
+.deal-compact .deal-header{margin-bottom:0!important}
+.deal-compact .deal-header .deal-header-actions{display:none!important}
+.deal-compact .deal-header .deal-header-status{margin:0!important;justify-content:flex-start!important;width:auto!important}
+.deal-compact .deal-decision-overview,.deal-compact .deal-status-guidance,.deal-compact .deal-b2c-market,.deal-compact .deal-compact-summary{display:none!important}
+.deal-compact>.deal-division-nav{margin-bottom:0}
+.deal-division-section{scroll-margin-top:105px}
+.deal-division-section:focus{outline:2px solid #f59e0b;outline-offset:3px}
+@media(max-width:1080px){.deal-division-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:550px){.deal-division-nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 
@@ -1416,6 +1435,18 @@
       }
     }
 
+    document.getElementById('deals-container').addEventListener('click',event=>{
+      const button=event.target.closest('[data-deal-division]');
+      if(!button)return;
+      event.stopPropagation();
+      const id=String(button.dataset.dealId),section=button.dataset.dealDivision;
+      const card=document.getElementById('deal-card-'+id);
+      if(!card)return;
+      if(card.classList.contains('deal-compact'))toggleDealCard(id);
+      card.querySelectorAll('.deal-division-link').forEach(b=>b.setAttribute('aria-current',String(b===button)));
+      const target=card.querySelector('[data-division-section="'+section+'"]');
+      if(target){target.scrollIntoView({behavior:'smooth',block:'start'});target.focus({preventScroll:true});}
+    });
     async function fetchDeals() {
 
       const container =
@@ -1624,7 +1655,7 @@
             <!-- DEAL HEADER -->
 
             <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
-              <div class="w-full flex justify-end"><span title="${escapeHtml(deepStatus.detail)}" class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${deepStatus.color}">${escapeHtml(deepStatus.label)}</span></div>
+              <div class="deal-header-status w-full flex justify-end"><span title="${escapeHtml(deepStatus.detail)}" class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${deepStatus.color}">${escapeHtml(deepStatus.label)}</span></div>
 
               <div class="min-w-0">
 
@@ -1650,7 +1681,7 @@
 
               </div>
 
-              <div class="flex items-center gap-3">
+              <div class="deal-header-actions flex items-center gap-3">
 
                 <div class="text-right">
 
@@ -1675,6 +1706,19 @@
 
             </div>
 
+
+            <!-- SIEBEN ABTEILUNGEN: in jeder Ansicht direkt erreichbar -->
+            <nav class="deal-division-nav" aria-label="Abteilungen der Deal-Akte">
+              ${[
+                ['radar','01','RADAR','Einkauf',Boolean(deal.offer_url)],
+                ['cipher','02','CIPHER','Identität',Boolean(deal.cipher_research?.checked_at)],
+                ['oracle','03','ORACLE','Markt',Boolean(deal.market_deep_dive?.checked_at)],
+                ['quantum','04','QUANTUM','Wirtschaft',Boolean(deal.quantum_calculation?.checked_at)],
+                ['verdict','05','VERDICT','Entscheidung',Boolean(deal.human_verdict?.verdict_grade)],
+                ['portrait','06','PRODUKT','Porträt',Boolean(deal.product_portrait)],
+                ['audience','07','ZIELGRUPPEN','Käufer',Boolean(deal.target_audience)]
+              ].map(([key,n,label,description,done])=>'<button type="button" class="deal-division-link" data-deal-division="'+key+'" data-deal-id="'+dealId+'" aria-label="'+n+' '+label+' öffnen"><span class="deal-division-index">'+n+' · '+(done?'●':'○')+'</span><strong>'+label+'</strong><small>'+description+'</small></button>').join('')}
+            </nav>
 
             <!-- KOMPAKTE ENTSCHEIDUNGSANSICHT: keine redundanten Statusboxen -->
             <div class="deal-decision-overview" aria-label="Deal auf einen Blick">
@@ -1738,7 +1782,7 @@
 
               <!-- RADAR -->
 
-              <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col justify-between">
+              <div data-division-section="radar" tabindex="-1" class="deal-division-section class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col justify-between">
 
                 <div>
 
@@ -1791,7 +1835,7 @@
 
               <!-- CIPHER -->
 
-              <div style="--accent:#64748b" class="division-workcard rounded-xl">
+              <div data-division-section="cipher" tabindex="-1" class="deal-division-section style="--accent:#64748b" class="division-workcard rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -1855,7 +1899,7 @@
 
               <!-- ORACLE -->
 
-              <div style="--accent:#0891b2" class="division-workcard rounded-xl">
+              <div data-division-section="oracle" tabindex="-1" class="deal-division-section style="--accent:#0891b2" class="division-workcard rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -1892,7 +1936,7 @@
 
               <!-- QUANTUM -->
 
-              <div style="--accent:#d97706" class="division-workcard rounded-xl">
+              <div data-division-section="quantum" tabindex="-1" class="deal-division-section style="--accent:#d97706" class="division-workcard rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -1979,7 +2023,7 @@
 
               <!-- VERDICT -->
 
-              <div style="--accent:#9333ea" class="division-workcard rounded-xl flex flex-col justify-between">
+              <div data-division-section="verdict" tabindex="-1" class="deal-division-section style="--accent:#9333ea" class="division-workcard rounded-xl flex flex-col justify-between">
 
                 <div>
 
@@ -2013,7 +2057,7 @@
               <!-- BREITE KI-KACHELN: zwei Spalten statt schmalem Dreier-Grid -->
               <div class="deal-ai-wide-grid">
               <!-- PRODUKTPORTRÄT -->
-              <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
+              <div data-division-section="portrait" tabindex="-1" class="deal-division-section class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKTPORTRÄT</span>
@@ -2031,7 +2075,7 @@
               </div>
 
               <!-- ZIELGRUPPEN -->
-              <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
+              <div data-division-section="audience" tabindex="-1" class="deal-division-section class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-violet-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · ZIELGRUPPEN</span>
