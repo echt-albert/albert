@@ -1933,7 +1933,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
           const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
           const signals=[deal.supplier_name?('Anbieter: '+deal.supplier_name):null].filter(Boolean);
-          const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description].find(v=>typeof v==='string'&&v.trim());
+          const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description,typeof deal.decision_reason==='string'&&deal.decision_reason.startsWith('RADAR-Hinweis (ungeprüft):')?deal.decision_reason.split(' · ')[0].replace('RADAR-Hinweis (ungeprüft): ',''):null].find(v=>typeof v==='string'&&v.trim());
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['WATCH','👁 Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
           return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
