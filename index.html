@@ -1000,6 +1000,35 @@
       const button=event.target.closest('[data-cipher-search]');
       if(button){event.stopPropagation();searchCipherIdentity(button.dataset.cipherSearch);}
     });
+    // ORACLE V2: Händlerhinweise sind Indikationen, nicht verifizierte Gesamtpreise.
+    const oracleLocalKey=id=>'albert:oracle-report:v2:'+id;
+    function oracleReport(deal) {
+      if(deal.market_deep_dive) return deal.market_deep_dive;
+      try { return JSON.parse(localStorage.getItem(oracleLocalKey(deal.id))||'null'); } catch(_) {return null;}
+    }
+    function oracleMarketCard(deal) {
+      const report=oracleReport(deal);
+      const offers=(Array.isArray(report?.shopping_results)?report.shopping_results:[])
+        .filter(x=>x?.merchant&&safeUrl(x.url)&&x.display_price);
+      const verified=offers.filter(x=>x.total_price_verified===true&&Number.isFinite(Number(x.total_price))&&Number(x.total_price)>0);
+      const fmt=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+      const lowest=verified.length?Math.min(...verified.map(x=>Number(x.total_price))):null;
+      const numeric=offers.map(x=>{const raw=String(x.display_price).replace(/[^0-9,.]/g,'');const n=Number(raw.replace(/\./g,'').replace(',','.'));return Number.isFinite(n)&&n>0?n:null;}).filter(n=>n!==null);
+      const range=numeric.length?fmt(Math.min(...numeric))+(numeric.length>1?' – '+fmt(Math.max(...numeric)):''):'Noch keine Preisindikation';
+      const sourceRows=offers.slice(0,6).map(x=>{
+        const isVerified=x.total_price_verified===true&&Number(x.total_price)>0;
+        const price=isVerified?fmt(x.total_price):String(x.display_price);
+        const shipping=x.display_shipping?String(x.display_shipping):'Versand unbekannt';
+        return '<div class="flex justify-between gap-3 py-1 border-b border-slate-100"><a class="text-cyan-700 underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><span class="text-right">'+escapeHtml(price)+' · '+escapeHtml(isVerified?'inkl. Versand bestätigt':shipping+' · Hinweis')+'</span></div>';
+      }).join('');
+      const diagnosis=(report?.diagnostics||[]).map(x=>escapeHtml(x.engine)+': '+escapeHtml(x.hits??'–')+' Treffer').join(' · ');
+      return '<div class="rounded-lg border border-cyan-100 bg-cyan-50/40 p-3"><div class="text-[10px] font-semibold text-cyan-800 uppercase">Marktpreis-Indikation · Artikelpreise</div><div class="text-lg font-semibold">'+escapeHtml(range)+'</div><div class="text-[10px] text-slate-500">Suchtreffer mit Quellen; keine verifizierten Gesamtpreise. Unterschiedliche Gebinde/Varianten möglich.</div></div>'+
+        '<div class="mt-2 flex justify-between text-[11px]"><span>Verifizierter Gesamtpreis inkl. Versand</span><strong>'+(lowest!==null?escapeHtml(fmt(lowest)):'Noch offen')+'</strong></div>'+
+        '<div class="mt-2 text-[10px] text-slate-500">'+offers.length+' Händlerhinweise · '+verified.length+' verifiziert'+(diagnosis?' · '+diagnosis:'')+'</div>'+
+        (sourceRows||'<p class="text-slate-400 mt-2">Noch keine konkreten Händlerquellen gefunden.</p>')+
+        (report?.checked_at?'<p class="mt-2 text-[10px] text-slate-500">Recherche: '+escapeHtml(new Date(report.checked_at).toLocaleString('de-DE'))+'</p>':'')+
+        '<p class="mt-1 text-[10px] text-amber-700">Indikation ist keine Freigabe für QUANTUM. Verifizierung von Identität, Verfügbarkeit und Endpreis erforderlich.</p>';
+    }
     const activeOracleSearch = new Set();
     async function searchOraclePrices(dealId) {
       const id=String(dealId);
@@ -1013,16 +1042,20 @@
       try{
         const response=await fetch(SUPABASE_URL+'/functions/v1/albert-market',{
           method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
-          body:JSON.stringify({product:deal}),signal:AbortSignal.timeout(35000)
+          body:JSON.stringify({product:deal,discovery_id:Number(dealId)}),signal:AbortSignal.timeout(35000)
         });
         const data=await response.json();
         if(!response.ok||!data.success)throw Error(data.error||'ORACLE-Recherche fehlgeschlagen.');
-        const {error}=await supabaseClient.from('discoveries').update({market_deep_dive:data.report}).eq('id',dealId);
-        if(error)throw error;
+        // Serverbericht bevorzugen; falls Serverpersistenz scheitert, sichtbare
+        // lokale Indikation erhalten und niemals fälschlich als gespeichert melden.
+        let persisted=data.persisted===true;
+        if(!persisted){
+          try { localStorage.setItem(oracleLocalKey(dealId),JSON.stringify(data.report)); } catch (_) {}
+        }
         const count=(data.report?.shopping_results||[]).filter(row=>row.merchant&&safeUrl(row.url)&&row.display_price).slice(0,3).length;
         const traces=(data.report?.diagnostics||[]).map(x=>x.engine+': '+(x.hits??'?')+' Treffer, '+(x.accepted??0)+' übernommen'+(x.error?' ('+x.error+')':'')).join(' | ');
         console.info('ORACLE Suchdiagnose',dealId,traces,data.report?.warnings||[]);
-        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+' gespeichert.'+(count===0?' '+(traces||data.report?.warnings?.join('; ')||'Keine passenden Preisangaben.') : ''),false,count===0);
+        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+(persisted?' serverseitig gespeichert.':' lokal verfügbar (Server-Speicherung offen).')+(count===0?' '+(traces||data.report?.warnings?.join('; ')||'Keine passenden Preisangaben.') : ''),false,count===0);
       }catch(e){
         finishAlbertActivity('oracle-'+id,'ORACLE',e.message||String(e),true);
         showStatus('ORACLE: '+(e.message||e),true);
@@ -2227,19 +2260,7 @@
 
                 <div><h3 class="division-title">Deutscher Absatzmarkt</h3><p class="division-subtitle">Händlerangebote und Gesamtpreise inklusive Versand</p></div>
                 <div class="space-y-2 text-xs">
-                  <span class="text-[10px] text-slate-400 block mb-1">Deutsche B2C-Angebote · inkl. Versand, soweit belegt</span>
-                  ${Array.from({length:3},(_,idx)=>{
-                    const offers=Array.isArray(deal.market_deep_dive?.shopping_results) ? deal.market_deep_dive.shopping_results : [];
-                    const found=offers.filter(row=>row.merchant && safeUrl(row.url) && row.display_price).slice(0,3);
-                    const offer=found[idx];
-                    if(!offer)return '<div class="flex justify-between mono text-[11px] text-slate-400"><span>#'+(idx+1)+' &nbsp; –</span><span>–</span></div>';
-                    const shipping=String(offer.display_shipping||'').trim();
-                    const price=String(offer.display_price||'').trim();
-                    const verified=offer.total_price_verified===true && Number(offer.total_price)>0;
-                    const total=verified ? Number(offer.total_price).toFixed(2)+' €' : price + (shipping ? ' + Versand '+shipping : ' · Versand offen');
-                    return '<div class="flex justify-between items-start gap-2 mono text-[11px]"><span class="text-cyan-700">#'+(idx+1)+' <a href="'+safeUrl(offer.url)+'" target="_blank" rel="noopener noreferrer" class="underline hover:text-cyan-900">'+escapeHtml(offer.merchant)+' ↗</a></span><span class="text-right text-slate-700">'+escapeHtml(total)+'</span></div>';
-                  }).join('')}
-                  ${deal.market_deep_dive?.checked_at ? '<p class="text-[10px] text-amber-700">Suchtreffer, noch nicht unabhängig verifiziert · '+escapeHtml(new Date(deal.market_deep_dive.checked_at).toLocaleDateString('de-DE'))+'</p>' : '<p class="text-[10px] text-slate-400">Noch keine gezielte Händlerrecherche.</p>'}
+                  ${oracleMarketCard(deal)}
                   <button type="button" data-oracle-search="${deal.id}" ${activeOracleSearch.has(String(deal.id))?'disabled':''} class="division-action disabled:opacity-50">
                     ${activeOracleSearch.has(String(deal.id))?'Recherche läuft':'Recherche'}
                   </button>
