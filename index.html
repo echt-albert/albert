@@ -175,6 +175,7 @@
 
 @media(max-width:550px){.deal-division-section.division-unified{padding:14px}}
 
+.buyer-open-checks{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 12px;padding:9px 11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11px;color:#475569}.buyer-open-checks strong{color:#334155;margin-right:3px}
 /* Kaufmännische Eckdaten der eingeklappten und geöffneten Deal-Akte */
 .deal-facts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0 14px}
 .deal-fact{min-width:0;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px 11px}
@@ -1779,6 +1780,18 @@
               <div class="deal-fact"><span class="deal-fact-label">Anbieter</span><strong class="deal-fact-value">${escapeHtml(deal.supplier_name || 'Unbekannt')}</strong>${offerUrl ? '<a class="deal-fact-hint text-amber-800 underline" href="'+offerUrl+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>' : ''}</div>
             </div>
 
+            <div class="buyer-open-checks" aria-label="Offene Prüfpunkte">
+              <strong>Vor Entscheidung prüfen:</strong>
+              ${[
+                ...(!Number.isSafeInteger(Number(deal.quantity)) || Number(deal.quantity)<=0 ? [['radar','Menge fehlt · X']] : []),
+                ...(!hasPurchasePrice ? [['radar','EK fehlt']] : []),
+                ...(!deal.ean_gtin && !deal.mpn ? [['cipher','Produktkennung fehlt']] : []),
+                ...(!deal.cipher_research?.checked_at ? [['cipher','Identität offen']] : []),
+                ...(b2cLowest==null ? [['oracle','B2C-Gesamtpreis offen']] : []),
+                ...(!deal.quantum_calculation?.checked_at ? [['quantum','Kalkulation offen']] : []),
+                ...(!deal.human_verdict?.verdict_grade ? [['verdict','Entscheidung offen']] : [])
+              ].map(([key,label])=>'<button type="button" class="px-2 py-1 border rounded-md bg-white hover:bg-slate-100" data-deal-division="'+key+'" data-deal-id="'+dealId+'">'+escapeHtml(label)+' ↗</button>').join('') || '<span>Standardprüfungen vollständig · weitere Risiken separat prüfen</span>'}
+            </div>
             <!-- SIEBEN ABTEILUNGEN: in jeder Ansicht direkt erreichbar -->
             <nav class="deal-division-nav" aria-label="Abteilungen der Deal-Akte">
               ${[
@@ -1963,7 +1976,7 @@
               <div class="text-[11px] text-slate-600">
                   ${deal.cipher_research?.checked_at ? '<p class="font-semibold text-slate-700 mb-2">Recherche: '+escapeHtml(new Date(deal.cipher_research.checked_at).toLocaleDateString('de-DE'))+' · noch nicht verifiziert</p>' : '<p class="text-slate-400">Noch keine gezielte Identitätsrecherche.</p>'}
                   ${(deal.cipher_research?.results||[]).slice(0,4).map(hit=>'<div class="mt-2"><a href="'+safeUrl(hit.url)+'" target="_blank" rel="noopener noreferrer" class="text-sky-800 underline break-words">'+escapeHtml(hit.title||'Recherchehinweis')+' ↗</a>'+(hit.ean_mentioned||hit.mpn_mentioned?'<span class="text-amber-700"> · Kennung im Suchtreffer</span>':'')+'</div>').join('')}
-                  ${deal.cipher_research?.checked_at?'<p class="mt-2 text-amber-800">Suchtreffer sind keine verifizierten Produkt- oder Compliance-Nachweise.</p>':''}
+
                 </div>
                 <button type="button" data-cipher-search="${deal.id}" ${activeCipherResearch.has(String(deal.id))?"disabled":""} class="division-action disabled:opacity-50">${activeCipherResearch.has(String(deal.id))?'Prüfung läuft':'Identität prüfen'}</button>
               </div>
