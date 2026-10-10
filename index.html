@@ -161,12 +161,18 @@
 .division-unified .division-action:focus-visible,.division-unified .ai-card-action:focus-visible,.division-unified .division-secondary-action:focus-visible{outline:2px solid #d97706;outline-offset:2px}
 .division-unified .division-action:disabled,.division-unified .division-action-unavailable{opacity:.6;cursor:not-allowed}
 .division-unified .division-secondary-action{flex:none;min-height:36px;border:1px solid #e2e8f0;border-radius:9px;padding:7px 11px;background:#fff;color:#475569;font-size:11px;font-weight:600;white-space:nowrap}
-.division-unified .ai-followup{margin-top:auto}
-.division-unified .ai-card-action{order:3}
-.division-unified .ai-followup{order:2}
+/* Ein Aktionsanker pro Karte: Hauptaktion immer am unteren Innenrand. */
+.division-unified>.division-action,.division-unified>.ai-card-action{margin-top:auto;flex-shrink:0}
+.division-unified>.division-action,.division-unified>.ai-card-action{order:10}
+.division-unified>.ai-followup{order:5;margin-top:0}
 .division-unified .ai-followup-form{align-items:stretch}
 .division-unified .ai-followup-input{min-width:0}
-.division-unified .ai-card-action{margin-top:4px}
+/* ORACLE-Aktion sitzt innerhalb des Ergebniscontainers; diesen strecken. */
+.division-unified[data-division-section="oracle"]>div:last-child{display:flex;flex:1;flex-direction:column}
+.division-unified[data-division-section="oracle"]>div:last-child>.division-action{margin-top:auto;flex-shrink:0}
+/* Die fünf Standardkarten und die zwei breiten KI-Karten nutzen dieselbe untere Kante. */
+.division-unified[data-division-section="radar"]>div:first-child,.division-unified[data-division-section="verdict"]>div:first-child{flex:1}
+
 @media(max-width:550px){.deal-division-section.division-unified{padding:14px}}
 
 /* Kaufmännische Eckdaten der eingeklappten und geöffneten Deal-Akte */
