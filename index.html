@@ -355,11 +355,11 @@
       <div>
 
         <h1 class="text-lg font-semibold tracking-tight text-[#1d1d1f]">
-          Intelligence Feed & Live Discoveries
+          Albert · B2B-Schnäppchenjagd
         </h1>
 
         <p class="text-xs text-slate-400 mono mt-0.5">
-          Resonance Deck · Live-Anbindung an Supabase
+          Echte Angebote entdecken. Du entscheidest, was interessant ist.
         </p>
 
       </div>
@@ -371,7 +371,7 @@
 
         <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
 
-        Sofort-Jagd auslösen
+        🔎 Sofort-Jagd starten
 
       </button>
 
@@ -1068,7 +1068,7 @@
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
-      if (action === 'DEEP_DIVE' && !requireDealQuantity(window.albertDealsById?.get(String(dealId)))) return;
+      // A missing quantity must not prevent the buyer from requesting a deeper review.
       const card = document.getElementById('deal-card-' + dealId);
       if (!card) return;
       const panel = document.getElementById('albert-decision-modal');
@@ -1243,7 +1243,7 @@
     // =======================================================
 
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
-    let activeDealView = 'ALL';
+    let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
     const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
@@ -1924,6 +1924,29 @@
 
       container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
+        // Discovery-first interface: analysis is deferred until the buyer selects Deep Dive.
+        if(activeDealView !== 'DEEP_DIVE'){
+          const id=escapeHtml(String(deal.id||''));
+          const source=safeUrl(deal.offer_url);
+          const price=Number(deal.purchase_price);
+          const priceKnown=Number.isFinite(price)&&price>0;
+          const qty=Number(deal.quantity);
+          const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
+          const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+          const signals=[deal.supplier_name?('Anbieter: '+deal.supplier_name):null,deal.hunt_origin==='SOFORT'?'In der Sofort-Jagd entdeckt':null].filter(Boolean);
+          const actions=[['WATCH','👁 Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
+          return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
+            '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
+            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p></div>'+
+            '<span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">Fund · ungeprüft</span></div>'+
+            '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
+            '<div><span class="block text-[10px] text-slate-500">EK laut Angebot</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
+            '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' Stück'):'Unbekannt')+'</strong></div>'+
+            '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
+            '<p class="mt-3 text-xs text-slate-600">'+escapeHtml(signals.join(' · ')||'Warum interessant? Noch keine belastbare Begründung vorhanden.')+'</p>'+
+            '<div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'</div>'+
+            '</article>';
+        }
         // ORACLE is the sole source of calculation-grade B2C prices.
         // Legacy market_prices are unverified historical indications only.
         const currentOracle = oracleReport(deal);
@@ -2529,29 +2552,9 @@
         ? research.saved_deals : [research.saved_deal].filter(Boolean);
       const saved = candidates.filter(item => item && item.id != null);
       if (!saved.length) return { outcome: 'empty', count: 0, stats: research.stats || {} };
-      // RADAR already persisted all candidates. Expensive analysis is bounded to one.
-      const first = saved[0];
-      onProgress('RADAR: ' + saved.length + ' gespeichert · CIPHER → ORACLE → QUANTUM für ersten Kandidaten …');
-      let analysisWarning = null;
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'pipeline', researchProduct: first,
-            messages: [{ role: 'user', content: query }] })
-        });
-        const data = await response.json();
-        if (!response.ok || !data.success) throw new Error(data.error || 'Brain-Auswertung fehlgeschlagen.');
-        const analysis = data.pipeline?.results;
-        if (analysis) {
-          const { error: saveError } = await supabaseClient.from('discoveries')
-            .update({ brain_analysis: analysis }).eq('id', first.id);
-          if (saveError) throw new Error(saveError.message);
-        }
-      } catch (error) {
-        // Analysis failure must not hide successfully persisted sourcing candidates.
-        analysisWarning = error.message || 'Analyse noch offen';
-      }
+      // Discovery first: never block new offers on expensive market or product analysis.
+      onProgress('RADAR: '+saved.length+' Kandidaten gefunden. Angebote werden angezeigt …');
+      const analysisWarning = null;
       const ids = saved.map(item => item.id);
       const { data: stored, error: verifyError } = await supabaseClient.from('discoveries')
         .select('id,hunt_origin').in('id', ids).eq('hunt_origin', 'SOFORT');

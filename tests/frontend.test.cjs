@@ -24,10 +24,12 @@ test('HTML has a document, title and deal container', () => {
 test('all inline JavaScript parses', () => {
   for (const code of scripts) assert.doesNotThrow(() => new vm.Script(code));
 });
-test('all seven deal cards are present', () => {
-  for (const name of ['RADAR', 'CIPHER', 'ORACLE', 'QUANTUM', 'VERDICT', 'PRODUKTPORTRÄT', 'ZIELGRUPPEN']) {
-    assert.ok(script.includes(name), 'missing ' + name);
-  }
+test('discovery-first interface keeps four buyer decisions and defers analysis', () => {
+  assert.match(script, /let activeDealView = 'SOFORT'/);
+  assert.match(script, /activeDealView !== 'DEEP_DIVE'/);
+  for (const action of ['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT']) assert.ok(script.includes(action), 'missing ' + action);
+  assert.match(script, /saved\.map\(item => item\.id\)/);
+  assert.doesNotMatch(script.slice(script.indexOf('async function runBrainResearch('),script.indexOf('window.triggerManualHunt =')), /mode: 'pipeline'/);
 });
 test('deal view reloads data and preserves expansion state', () => {
   assert.match(script, /async function fetchDeals\(/);
