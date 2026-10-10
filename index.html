@@ -352,6 +352,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-header-spuersinn{max-width:fit-content}
     .deal-header-spuersinn [data-spuersinn-kind],.deal-header-spuersinn [data-spuersinn-clear]{padding:7px 10px;font-size:11px;white-space:nowrap}
     @media(max-width:700px){.deal-header-spuersinn{max-width:100%}.deal-header-spuersinn [data-spuersinn-kind],.deal-header-spuersinn [data-spuersinn-clear]{white-space:normal}}
+
+    /* Neue Sofort-Jagd-Funde auf einen Blick sichtbar machen. */
+    .deal-sofort-highlight{border:2px solid #24a1d6!important;box-shadow:0 0 0 2px rgba(36,161,214,.07),0 2px 8px rgba(15,23,42,.05)}
+    .deal-sofort-highlight:hover{box-shadow:0 0 0 3px rgba(36,161,214,.12),0 6px 16px rgba(15,23,42,.08)}
 </style>
 </head>
 
@@ -2438,7 +2442,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description,typeof deal.decision_reason==='string'&&deal.decision_reason.startsWith('RADAR-Hinweis (ungeprüft):')?deal.decision_reason.split(' · ')[0].replace('RADAR-Hinweis (ungeprüft): ',''):null].find(v=>typeof v==='string'&&v.trim());
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
-          return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
+          return '<article id="deal-card-'+id+'" class="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow '+(deal.hunt_origin==='SOFORT'?'deal-sofort-highlight border-[#24a1d6]':'border-slate-200')+'">'+
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<div class="deal-header-spuersinn">'+spuersinnHtml(deal)+'</div></div>'+
