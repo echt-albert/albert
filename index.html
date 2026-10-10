@@ -1014,14 +1014,17 @@
       const fmt=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
       const lowest=verified.length?Math.min(...verified.map(x=>Number(x.total_price))):null;
       const numeric=offers.map(x=>{const raw=String(x.display_price).replace(/[^0-9,.]/g,'');const n=Number(raw.replace(/\./g,'').replace(',','.'));return Number.isFinite(n)&&n>0?n:null;}).filter(n=>n!==null);
-      const range=numeric.length?fmt(Math.min(...numeric))+(numeric.length>1?' – '+fmt(Math.max(...numeric)):''):'Noch keine Preisindikation';
+      const indication=report?.market_indication;
+      const range=indication?.lowest_article_price>0
+        ?fmt(indication.lowest_article_price)+(indication.highest_article_price>indication.lowest_article_price?' – '+fmt(indication.highest_article_price):'')
+        :numeric.length?fmt(Math.min(...numeric))+(numeric.length>1?' – '+fmt(Math.max(...numeric)):''):'Noch keine Preisindikation';
       const sourceRows=offers.slice(0,6).map(x=>{
         const isVerified=x.total_price_verified===true&&Number(x.total_price)>0;
         const price=isVerified?fmt(x.total_price):String(x.display_price);
         const shipping=x.display_shipping?String(x.display_shipping):'Versand unbekannt';
         return '<div class="flex justify-between gap-3 py-1 border-b border-slate-100"><a class="text-cyan-700 underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><span class="text-right">'+escapeHtml(price)+' · '+escapeHtml(isVerified?'inkl. Versand bestätigt':shipping+' · Hinweis')+'</span></div>';
       }).join('');
-      const diagnosis=(report?.diagnostics||[]).map(x=>escapeHtml(x.engine)+': '+escapeHtml(x.hits??'–')+' Treffer').join(' · ');
+      const diagnosis=(report?.diagnostics||[]).map(x=>escapeHtml(x.engine)+': '+escapeHtml(x.hits??'–')+' Treffer'+(x.error?' (Fehler)':'')).join(' · ');
       return '<div class="rounded-lg border border-cyan-100 bg-cyan-50/40 p-3"><div class="text-[10px] font-semibold text-cyan-800 uppercase">Marktpreis-Indikation · Artikelpreise</div><div class="text-lg font-semibold">'+escapeHtml(range)+'</div><div class="text-[10px] text-slate-500">Suchtreffer mit Quellen; keine verifizierten Gesamtpreise. Unterschiedliche Gebinde/Varianten möglich.</div></div>'+
         '<div class="mt-2 flex justify-between text-[11px]"><span>Verifizierter Gesamtpreis inkl. Versand</span><strong>'+(lowest!==null?escapeHtml(fmt(lowest)):'Noch offen')+'</strong></div>'+
         '<div class="mt-2 text-[10px] text-slate-500">'+offers.length+' Händlerhinweise · '+verified.length+' verifiziert'+(diagnosis?' · '+diagnosis:'')+'</div>'+
