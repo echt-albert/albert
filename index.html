@@ -1274,6 +1274,31 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       if(!deal)return;
       loadQuickMarket([deal]);
     });
+    const insightCache=new Map(),insightPending=new Set();
+    async function runDealInsight(id,mode){
+      const deal=window.albertDealsById?.get(id);
+      const target=document.querySelector('[data-insight-result="'+id+'"]');
+      if(!deal||!target)return;
+      const key=id+':'+mode;
+      if(insightCache.has(key)){target.textContent=insightCache.get(key);return;}
+      if(insightPending.has(key))return;
+      insightPending.add(key);
+      target.textContent=mode==='opportunities'?'🎯 Marktchancen werden recherchiert …':'💡 Vermarktungsideen werden entwickelt …';
+      try{
+        const response=await fetch(SUPABASE_URL+'/functions/v1/albert-deal-insights',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({mode,product:deal}),signal:AbortSignal.timeout(45000)});
+        const data=await response.json();
+        if(!response.ok||!data.success)throw Error(data.error||'Analyse fehlgeschlagen');
+        const text=String(data.text||'Keine Ergebnisse gefunden');
+        insightCache.set(key,text);
+        target.textContent=text;
+      }catch(error){target.textContent='Analyse momentan nicht verfügbar. Bitte später erneut versuchen.';}
+      finally{insightPending.delete(key);}
+    }
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('[data-insight-button]');
+      if(!button)return;
+      runDealInsight(String(button.dataset.dealId||''),button.dataset.insightButton);
+    });
     let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
@@ -1984,6 +2009,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
             '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
             '<div class="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/40 px-3 py-3 text-xs" data-quick-market="'+id+'"><button type="button" class="font-semibold text-cyan-800 hover:underline" data-quick-market-button="'+id+'">🇩🇪 Marktpreis prüfen ↗</button><span class="ml-2 text-slate-500">Nur auf Klick · KI-Indikation, ungeprüft</span></div>'+
+            '<div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">'+
+              '<button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-amber-50" data-insight-button="opportunities" data-deal-id="'+id+'">🎯 Marktchancen entdecken</button>'+
+              '<button type="button" class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-amber-50" data-insight-button="marketing" data-deal-id="'+id+'">💡 Vermarktungsideen entwickeln</button>'+
+            '</div><div data-insight-result="'+id+'" class="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-700"></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
             '<div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'</div>'+
             '</article>';
