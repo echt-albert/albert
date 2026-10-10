@@ -1011,6 +1011,7 @@
         const { data: deal, error: readError } = await supabaseClient
           .from('discoveries').select('*').eq('id', dealId).single();
         if (readError || !deal) throw new Error(readError?.message || 'Posten nicht gefunden.');
+        if (action === 'DEEP_DIVE' && dealQuantityBlocked(deal)) throw new Error('X-Ausschluss: Keine gültige Postenmenge. Deep Dive und Kaufempfehlung gesperrt.');
         const feedback = { action, comment: comment.trim().slice(0, 1500) || null };
         const { error: feedbackError } = await supabaseClient.from('deal_feedback')
           .insert({ discovery_id: dealId, ...feedback });
