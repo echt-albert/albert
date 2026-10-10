@@ -18,6 +18,16 @@ Deno.serve(async req=>{
  const {data:{user},error:authError}=await auth.auth.getUser();
  if(authError||!user||!user.email||!allowed.includes(user.email.toLowerCase()))return respond({success:false,error:"Keine Importberechtigung"},403);
  const body=await req.json().catch(()=>null);
+ if(body?.action==="set_label"){
+   const ids=Array.isArray(body.ids)?[...new Set(body.ids.map((x:unknown)=>Number(x)))]:[];
+   if(!ids.length||ids.length>1000||ids.some((x:number)=>!Number.isSafeInteger(x)||x<=0))return respond({success:false,error:"Ungültige Deal-Auswahl"},400);
+   const label=str(body.label,49);
+   if(label.length>48)return respond({success:false,error:"Label zu lang"},400);
+   const db=createClient(url,secret);
+   const {data,error}=await db.from("discoveries").update({deal_label:label||null}).in("id",ids).select("id");
+   if(error)return respond({success:false,error:"Labels konnten nicht gespeichert werden"},500);
+   return respond({success:true,updated:data?.length||0});
+ }
  if(!body||!Array.isArray(body.rows)||body.rows.length<1||body.rows.length>1000)return respond({success:false,error:"1 bis 1.000 Positionen erforderlich"},400);
  const filename=str(body.filename,160),supplier=str(body.supplier_name,160),dealLabel=str(body.deal_label,48).trim();
  if(!filename)return respond({success:false,error:"Dateiname fehlt"},400);
