@@ -621,7 +621,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <!-- JAVASCRIPT -->
   <!-- ===================================================== -->
 
-  <script>
+  <script src="scanner-intelligence.js" defer></script>\n  <script>
 
 
 function openListScanner(){
@@ -715,6 +715,11 @@ async function handleListScannerFile(file){
 async function handleScannerFiles(files){
  const list=Array.from(files||[]);if(!list.length)return;
  if(list.length===1&&/\.csv$/i.test(list[0].name)){await handleListScannerFile(list[0]);return;}
+ if(list.length===1&&/\.pdf$/i.test(list[0].name)){
+  const result=document.getElementById('list-scanner-result'),preview=document.getElementById('list-scanner-preview');
+  result.classList.remove('hidden');preview?.classList.add('hidden');preview?.replaceChildren();scannerData=null;
+  await window.albertScannerIntelligence.showPdf(list[0],result);return;
+ }
  const result=document.getElementById('list-scanner-result'),preview=document.getElementById('list-scanner-preview');
  result.classList.remove('hidden');result.replaceChildren();preview?.classList.add('hidden');preview?.replaceChildren();scannerData=null;
  result.append(scannerEl('h3','text-base font-semibold text-slate-900','Dateivorschau'));
