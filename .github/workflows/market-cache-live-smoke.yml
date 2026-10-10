@@ -27,3 +27,18 @@ jobs:
                   print("CALL",i+1,"FAILED",type(e).__name__,str(e)[:250])
               time.sleep(1)
           PY
+      - name: Run real ORACLE Deep Market request
+        env:
+          MARKET_URL: https://ybkeuxpwedvbehvodlak.supabase.co/functions/v1/albert-market
+          PUBLIC_KEY: sb_publishable_WCa_T9rQsOwJbHYOdlvlfw_nPlB409n
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          payload=json.dumps({"product":{"product_name":"Instant Pot Vortex Plus VersaZone Heißluftfritteuse 8.5L","brand":"Instant Pot","mpn":"140-4100-01-EU","ean_gtin":"810102264817"}}).encode()
+          req=urllib.request.Request(os.environ["MARKET_URL"],data=payload,headers={"Content-Type":"application/json","apikey":os.environ["PUBLIC_KEY"],"Authorization":"Bearer "+os.environ["PUBLIC_KEY"]})
+          try:
+              with urllib.request.urlopen(req,timeout=95) as response:
+                  d=json.load(response)
+                  print("DEEP success",d.get("success"),"has_report",bool(d.get("report")),"error",d.get("error"))
+          except Exception as e: print("DEEP FAILED",type(e).__name__,str(e)[:250])
+          PY
