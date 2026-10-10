@@ -2961,7 +2961,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <span class="font-semibold text-amber-900">${escapeHtml(actionLabel)}</span>
               <span>EK: ${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'unbekannt'}</span>
               <span>Urteil: ${grade}</span>
-              <span class="font-semibold text-amber-900">03 · Markt & Wirtschaftlichkeit</span>
+              <span class="font-semibold text-amber-900">Markt & Wirtschaftlichkeit</span>
               <span>Verifizierter B2C-Gesamtpreis: ${hasVerifiedMarket ? avgMarket.toFixed(2) + ' €' : '—'}</span>
               <span>Differenz: ${absoluteMargin !== null ? absoluteMargin.toFixed(2) + ' €' : '—'}</span>
               ${latestFeedback?.comment ? `<span class="truncate max-w-[360px]" title="${escapeHtml(latestFeedback.comment)}">${escapeHtml(latestFeedback.comment)}</span>` : ''}
@@ -2982,7 +2982,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
 
                     <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-900 mono">
-                      01 · Einkauf
+                      Einkauf
                     </span>
 
                   </div>
@@ -3033,7 +3033,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                   <span class="w-2 h-2 rounded-full bg-slate-500"></span>
 
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-700 mono">
-                    02 · Identität
+                    Identität
                   </span>
 
                 </div>
@@ -3090,7 +3090,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
               <!-- ZENTRALE ANALYSE: Markt + Kalkulation + Einschätzung -->
               <div data-division-section="oracle" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl albert-unified-analysis">
-                <div class="flex items-center gap-2 mb-3"><span class="w-2 h-2 rounded-full bg-cyan-500"></span><span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mono">03 · Markt & Wirtschaftlichkeit</span></div>
+                <div class="flex items-center gap-2 mb-3"><span class="w-2 h-2 rounded-full bg-cyan-500"></span><span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mono">Markt & Wirtschaftlichkeit</span></div>
                 <h3 class="division-title">Lohnt sich dieser Posten?</h3>
                 <p class="division-subtitle mb-3">Marktpreise, deine Kosten und eine nachvollziehbare Einschätzung an einem Ort.</p>
                 <section class="albert-analysis-quick-tools rounded-xl border border-slate-200 bg-slate-50/70 p-3 mb-4" aria-label="Schnellwerkzeuge zur Marktanalyse">
@@ -3135,7 +3135,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <div data-division-section="portrait" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · Produkt</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">Produkt</span>
                 </div>
                 <button type="button" class="ai-card-action division-action" data-ai-type="portrait" data-deal-id="${dealId}">Produkt Check</button>
                 <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Produktporträt noch nicht gestartet.</span>'}</p>
@@ -3153,7 +3153,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <div data-division-section="audience" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-violet-500"></span>
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · Käufer</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">Käufer</span>
                 </div>
                 <button type="button" class="ai-card-action division-action" data-ai-type="audience" data-deal-id="${dealId}">Zielgruppe</button>
                 <div id="target-audience-${dealId}" class="space-y-3 text-[12px] leading-relaxed text-slate-700">
