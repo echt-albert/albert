@@ -295,7 +295,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       </div>
 
-      <button type="button" onclick="toggleSourceRadar()" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
+      <button type="button" id="source-radar-nav" onclick="toggleSourceRadar()" aria-pressed="false" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Deal-Ablage">
         <button type="button" data-view="SOFORT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>⚡ Sofort-Jagd</span><span data-count="SOFORT" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="WATCH" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
@@ -505,7 +505,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 let radarDeals=[];let researchedSources=[];
 function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
 function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
-function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);if(show){renderSourceRadar();loadResearchedSources()}}
+function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);const nav=document.getElementById('source-radar-nav');if(nav){nav.classList.toggle('bg-amber-50',show);nav.classList.toggle('text-amber-800',show);nav.classList.toggle('font-semibold',show);nav.classList.toggle('ring-1',show);nav.classList.toggle('ring-amber-300',show);nav.setAttribute('aria-pressed',String(show));}if(show){renderSourceRadar();loadResearchedSources()}}
 async function loadResearchedSources(){
 const {data,error}=await supabaseClient.from('sourcing_sources').select('*').order('discovered_at',{ascending:false}).limit(100);
 if(!error){researchedSources=data||[];renderSourceRadar();}
