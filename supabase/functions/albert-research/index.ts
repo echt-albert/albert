@@ -32,21 +32,7 @@ function candidatesFrom(raw: string): Candidate[] {
     : value?.offer_url ? [value] : [];
   return arr.filter(x => x && typeof x === "object").slice(0, 12);
 }
-async function urlCheck(url: string): Promise<"ok" | "unverified" | "rejected"> {
-  // HEAD is often blocked by real shops. GET is a fallback, not proof of stock.
-  for (const method of ["HEAD", "GET"] as const) {
-    try {
-      const res = await fetch(url, { method, redirect: "follow", signal: AbortSignal.timeout(6500),
-        headers: method === "GET" ? { Range: "bytes=0-1024" } : {} });
-      await res.body?.cancel();
-      if (res.ok) return "ok";
-      if ([401, 403, 405, 429].includes(res.status)) continue;
-      if (res.status === 404 || res.status === 410) return "rejected";
-    } catch { /* next method */ }
-  }
-  return "unverified"; // Not a reliable reason to discard a potentially real offer.
-}
-serve(async req => {
+// URLs are syntactically checked, but not fetched from the server.\n// Server-side arbitrary URL fetches would create an SSRF risk.\nserve(async req => {
   if (req.method === "OPTIONS") return reply({});
   if (req.method !== "POST") return reply({ success: false, error: "POST only" }, 405);
   const key = Deno.env.get("GEMINI_API_KEY");
@@ -55,7 +41,7 @@ serve(async req => {
   if (!key || !url || !secret) return reply({ success: false, error: "Research configuration missing" }, 500);
   // Only server-to-server invocations may trigger billable research.
   const auth = req.headers.get("authorization") || "";
-  if (auth !== "Bearer " + secret && req.headers.get("apikey") !== secret)
+  if (auth !== "Bearer " + secret)
     return reply({ success: false, error: "Unauthorized" }, 401);
   const db = createClient(url, secret, { auth: { persistSession: false } });
   let runId: string | number | null = null;
@@ -95,9 +81,7 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       const productName = text(candidate.product_name).slice(0, 255);
       if (!offerUrl || !productName || seen.has(offerUrl)) { stats.invalid++; continue; }
       seen.add(offerUrl);
-      const urlState = await urlCheck(offerUrl);
-      if (urlState === "rejected") { stats.dead++; continue; }
-      if (urlState === "unverified") stats.urlUnverified++;
+      const urlState = "unverified"; // Human/grounded verification is required.\n      stats.urlUnverified++;
       const existing = await db.from("discoveries").select("id").eq("offer_url", offerUrl).limit(1);
       if (existing.error) throw existing.error;
       if (existing.data?.length) { stats.duplicates++; continue; }
@@ -123,7 +107,7 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       saved.push(inserted.data); stats.saved++;
     }
     await db.from("research_runs").update({ status: "completed",
-      finished_at: new Date().toISOString() }).eq("id", runId);
+      finished_at: new Date().toISOString(), finds_count: stats.saved }).eq("id", runId);
     return reply({ success: true, status: saved.length ? "new_saved" : "no_new_deals",
       saved_deal: saved[0] || null, saved_deals: saved, stats, run_id: runId });
   } catch (error) {
