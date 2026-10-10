@@ -19,7 +19,7 @@ Deno.serve(async req=>{
  if(authError||!user||!user.email||!allowed.includes(user.email.toLowerCase()))return respond({success:false,error:"Keine Importberechtigung"},403);
  const body=await req.json().catch(()=>null);
  if(!body||!Array.isArray(body.rows)||body.rows.length<1||body.rows.length>1000)return respond({success:false,error:"1 bis 1.000 Positionen erforderlich"},400);
- const filename=str(body.filename,160),supplier=str(body.supplier_name,160);
+ const filename=str(body.filename,160),supplier=str(body.supplier_name,160),dealLabel=str(body.deal_label,48).trim();
  if(!filename)return respond({success:false,error:"Dateiname fehlt"},400);
  const db=createClient(url,secret);
  let created=0,skipped=0;const errors=[];
@@ -40,7 +40,7 @@ Deno.serve(async req=>{
   const candidate=str(row.offer_url||testValues?.quelle||testValues?.quellenlink,2000);
   let verifiedUrl="";
   try{const u=new URL(candidate);if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)verifiedUrl=u.toString();}catch{/* Missing or invalid URL stays empty */}
-  if(dealId){const {error:originError}=await db.from("discoveries").update({hunt_origin:"SCANNER"}).eq("id",dealId);if(originError)errors.push({line,error:"Scanner-Herkunft konnte nicht gespeichert werden"});}
+  if(dealId){const patch:Record<string,string>={hunt_origin:"SCANNER"};if(dealLabel)patch.deal_label=dealLabel;const {error:originError}=await db.from("discoveries").update(patch).eq("id",dealId);if(originError)errors.push({line,error:"Scanner-Herkunft oder Label konnte nicht gespeichert werden"});}
   if(dealId&&verifiedUrl){const {error:linkError}=await db.from("discoveries").update({offer_url:verifiedUrl}).eq("id",dealId);if(linkError)errors.push({line,error:"Quelllink konnte nicht gespeichert werden"});}
   // Testdaten separat halten: niemals als verifizierte Marktpreise speichern.
   if(testValues&&Object.values(testValues).some(v=>String(v??"").trim())){
