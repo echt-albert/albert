@@ -10,18 +10,20 @@ Deno.serve(async req=>{
  if(req.method==="OPTIONS")return respond({});
  if(req.method!=="POST")return respond({success:false,error:"POST erforderlich"},405);
  const url=Deno.env.get("SUPABASE_URL"),anon=Deno.env.get("SUPABASE_ANON_KEY"),secret=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
- const allowed=(Deno.env.get("SCANNER_ALLOWED_EMAILS")||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
- if(!url||!anon||!secret||!allowed.length)return respond({success:false,error:"Scanner-Import ist noch nicht für berechtigte Einkäufer konfiguriert."},503);
+ if(!url||!anon||!secret)return respond({success:false,error:"Scanner-Import: Supabase-Konfiguration unvollständig."},503);
  const token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"");
  if(!token)return respond({success:false,error:"Anmeldung erforderlich"},401);
  const auth=createClient(url,anon,{global:{headers:{Authorization:"Bearer "+token}}});
  const {data:{user},error:authError}=await auth.auth.getUser();
- if(authError||!user||!user.email||!allowed.includes(user.email.toLowerCase()))return respond({success:false,error:"Keine Importberechtigung"},403);
+ if(authError||!user)return respond({success:false,error:"Anmeldung erforderlich"},401);
+ const db=createClient(url,secret);
+ const {data:permission,error:permissionError}=await db.from("scanner_import_authorized_accounts").select("user_id").eq("user_id",user.id).maybeSingle();
+ if(permissionError)return respond({success:false,error:"Importberechtigung konnte nicht geprüft werden."},503);
+ if(!permission)return respond({success:false,error:"Keine Importberechtigung"},403);
  const body=await req.json().catch(()=>null);
  if(!body||!Array.isArray(body.rows)||body.rows.length<1||body.rows.length>1000)return respond({success:false,error:"1 bis 1.000 Positionen erforderlich"},400);
  const filename=str(body.filename,160),supplier=str(body.supplier_name,160);
  if(!filename)return respond({success:false,error:"Dateiname fehlt"},400);
- const db=createClient(url,secret);
  let created=0,skipped=0;const errors=[];
  for(let i=0;i<body.rows.length;i++){
   const row=body.rows[i]||{},product=str(row.product_name),ean=str(row.ean_gtin,14),brand=str(row.brand,160),mpn=str(row.mpn,120);
