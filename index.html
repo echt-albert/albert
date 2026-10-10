@@ -2846,14 +2846,14 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           const bidRaw=deal.scanner_test_values?.startpreis_gesamt_eur ?? (String(deal.decision_reason||'').match(/Startgebot:\s*([\d.,]+)\s*EUR/i)||[])[1];
           const bid=bidRaw==null||String(bidRaw).trim()===''?null:Number(String(bidRaw).replace(',','.'));
           const bidKnown=bid!==null&&Number.isFinite(bid)&&bid>=0;
-          const price=bidKnown?bid:Number(deal.purchase_price);
+          const price=bidKnown?bid:(deal.scanner_test_values?.datenstatus==='SIMULATION'&&Number(deal.scanner_test_values?.einkaufspreis_demo)>0?Number(deal.scanner_test_values.einkaufspreis_demo):Number(deal.purchase_price));
           const priceKnown=bidKnown||(Number.isFinite(price)&&price>0);
           const reasonRaw=String(deal.decision_reason||'');
           const auction=/auktion|versteigerung|startgebot|aufrufpreis|starting bid|Preisart:\s*auction_start/i.test(reasonRaw);
           const priceType=(reasonRaw.match(/Preisart:\s*(fixed|auction_start|negotiable|unknown)/i)||[])[1]||'unknown';
-          const priceScope=(reasonRaw.match(/Preiseinheit:\s*(unit|lot|unknown)/i)||[])[1]||'unknown';
+          const priceScope=deal.scanner_test_values?.datenstatus==='SIMULATION'?'unit':((reasonRaw.match(/Preiseinheit:\s*(unit|lot|unknown)/i)||[])[1]||'unknown');
           const unit=(reasonRaw.match(/Mengeneinheit:\s*([^·]+)/i)||[])[1]?.trim();
-          const priceTitle=bidKnown?'Startgebot (kein EK)':auction?'Startgebot (kein EK)':priceType==='fixed'?'Festpreis laut Angebot':priceType==='negotiable'?'Verhandlungsbasis':'Preis laut Angebot (ungeprüft)';
+          const priceTitle=deal.scanner_test_values?.datenstatus==='SIMULATION'&&!bidKnown?'EK pro Stück (Simulation)':bidKnown?'Startgebot (kein EK)':auction?'Startgebot (kein EK)':priceType==='fixed'?'Festpreis laut Angebot':priceType==='negotiable'?'Verhandlungsbasis':'Preis laut Angebot (ungeprüft)';
           const priceSuffix=priceScope==='lot'?' · Gesamtposten':priceScope==='unit'?' · je Einheit':'';
           const importedQty=deal.scanner_test_values?.menge_importiert;
           const qty=Number(deal.quantity||importedQty);
