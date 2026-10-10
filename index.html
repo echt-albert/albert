@@ -1900,20 +1900,14 @@
 
       container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
 
-        const rawPrices = Array.isArray(deal.market_prices)
-          ? deal.market_prices
-          : [];
-
-        const marketPrices = rawPrices
-          .map(value => Number(value))
-          .filter(value =>
-            Number.isFinite(value) && value > 0
-          );
-
-        const avgMarket = marketPrices.length > 0
-          ? marketPrices.reduce((a, b) => a + b, 0) /
-            marketPrices.length
-          : 0;
+        // ORACLE is the sole source of calculation-grade B2C prices.
+        // Legacy market_prices are unverified historical indications only.
+        const currentOracle = oracleReport(deal);
+        const verifiedOraclePrices = (Array.isArray(currentOracle?.shopping_results) ? currentOracle.shopping_results : [])
+          .filter(row => row?.total_price_verified === true && safeUrl(row.url) && Number.isFinite(Number(row.total_price)) && Number(row.total_price) > 0)
+          .map(row => Number(row.total_price));
+        const avgMarket = verifiedOraclePrices.length ? Math.min(...verifiedOraclePrices) : 0;
+        const hasVerifiedMarket = verifiedOraclePrices.length > 0;
 
         const purchasePrice = Number(deal.purchase_price);
 
@@ -1963,7 +1957,7 @@
         const compact = !expanded;
         const grade = escapeHtml(deal.human_verdict?.verdict_grade || deal.decision_grade || '—');
         const deepStatus = deepDiveStatus(deal);
-        const b2cReport = deal.market_deep_dive;
+        const b2cReport = currentOracle;
         const b2cOffers = Array.isArray(b2cReport?.shopping_results) ? b2cReport.shopping_results.filter(row => safeUrl(row.url)) : [];
         const b2cVerified = b2cOffers.filter(row => row.total_price_verified === true && Number.isFinite(Number(row.total_price)) && Number(row.total_price) > 0);
         const b2cLowest = b2cVerified.length ? Math.min(...b2cVerified.map(row => Number(row.total_price))) : null;
@@ -1996,7 +1990,7 @@
 
         return `
 
-          <article id="deal-card-${dealId}" data-market-verified="${deal.market_deep_dive?.verified_lowest_total_price != null}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <!-- DEAL HEADER -->
 
             <div class="deal-header deal-header-refined">
@@ -2118,7 +2112,7 @@
               <span>EK: ${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'unbekannt'}</span>
               <span>Urteil: ${grade}</span>
               <span class="font-semibold text-amber-900">04 · Kalkulation</span>
-              <span>Ø Markt: ${avgMarket > 0 ? avgMarket.toFixed(2) + ' €' : '—'}</span>
+              <span>Verifizierter B2C-Gesamtpreis: ${hasVerifiedMarket ? avgMarket.toFixed(2) + ' €' : '—'}</span>
               <span>Differenz: ${absoluteMargin !== null ? absoluteMargin.toFixed(2) + ' €' : '—'}</span>
               ${latestFeedback?.comment ? `<span class="truncate max-w-[360px]" title="${escapeHtml(latestFeedback.comment)}">${escapeHtml(latestFeedback.comment)}</span>` : ''}
             </div>
@@ -2283,13 +2277,13 @@
 
                 </div>
 
-                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">${quantityExcluded ? "X · Gesperrt: Menge fehlt oder Posten ausgeschlossen" : "Vorläufiger Rohvergleich · keine Vollkostenrechnung"}</p></div>
+                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">${quantityExcluded ? "X · Gesperrt: Menge fehlt oder Posten ausgeschlossen" : hasVerifiedMarket ? "Verifizierter B2C-Gesamtpreis · keine Vollkostenrechnung" : "Gesperrt · kein verifizierter B2C-Gesamtpreis"}</p></div>
                 <div class="space-y-2 text-xs">
 
                   <div class="flex justify-between gap-2">
 
                     <span class="text-slate-400">
-                      Ø Markt
+                      B2C-Gesamtpreis · verifiziert
                     </span>
 
                     <span class="mono text-[#1d1d1f]">
@@ -2397,13 +2391,13 @@
                     </div>
 
                     <span class="px-2 py-0.5 rounded text-[11px] font-semibold mono border ${gradeColor}">
-                      ${escapeHtml(deal.decision_grade || '—')}
+                      ${hasVerifiedMarket ? escapeHtml(deal.decision_grade || '—') : 'B · ungeprüft'}
                     </span>
 
                   </div>
 
                   <p class="text-[11px] text-slate-600 leading-relaxed">
-                    ${escapeHtml(deal.decision_reason || 'Keine Begründung.')}
+                    ${hasVerifiedMarket ? escapeHtml(deal.decision_reason || 'Keine Begründung.') : '<strong class="text-amber-800">Historische KI-Bewertung · nicht kaufentscheidungsfähig.</strong> Kein verifizierter B2C-Gesamtpreis vorhanden. Frühere Marktpreise und Margen sind nicht bestätigt.'}
                   </p>
 
                 </div>
