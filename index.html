@@ -150,6 +150,15 @@
 
 .deal-divisions > .division-workcard{padding:18px;border:1px solid #dce4ed;border-top:3px solid var(--accent,#94a3b8);background:#fff;display:flex;flex-direction:column;gap:12px;min-width:0}.division-workcard .division-title{font-size:15px;font-weight:750;line-height:1.35;color:#1e293b}.division-workcard .division-subtitle{font-size:11px;color:#64748b;line-height:1.5;margin-top:4px}.division-workcard .division-action{display:block;margin-top:auto;padding:10px 12px;text-align:center;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;font-size:12px;font-weight:700;color:#334155;cursor:pointer}.division-workcard .division-action:hover{background:#f1f5f9}
 
+/* Einheitliche Ausrichtung für alle Deal-Akten */
+.deal-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:start}
+.deal-header-status{grid-column:1/-1;grid-row:1;width:auto!important;justify-content:flex-start!important;margin:0!important}
+.deal-header>.min-w-0{grid-column:1;grid-row:2;min-width:0;width:100%;text-align:left}
+.deal-header>.min-w-0>div{justify-content:flex-start}
+.deal-header h2{text-align:left;margin:0}
+.deal-header-actions{grid-column:2;grid-row:2;align-self:start}
+.deal-compact .deal-header{grid-template-columns:minmax(0,1fr)}
+@media(max-width:640px){.deal-header{grid-template-columns:minmax(0,1fr)}.deal-header-actions{grid-column:1;grid-row:3}}
 /* Deal-Akte: schlanker Kopf und sieben direkt anwählbare Abteilungen */
 .deal-division-nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:12px 0 16px}
 .deal-division-link{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:11px 9px;border:1px solid #e2e8f0;border-radius:11px;background:#fff;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
