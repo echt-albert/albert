@@ -812,9 +812,10 @@ function renderScannerPreview(data){
  search.addEventListener('input',render);render();
  const importer=scannerEl('div','mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4');
  const supplier=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm');supplier.placeholder='Quelle / Insolvenzverwalter (optional)';
+ const importLabel=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm mt-2');importLabel.placeholder='🏷️ Label für alle Deals (z. B. VENTA 5710)';importLabel.maxLength=48;
  const importBtn=scannerEl('button','mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white','Als Deals in ☆ Unbewertet übernehmen');importBtn.type='button';
  const progress=scannerEl('p','mt-2 text-xs text-slate-600');
- importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importBtn,progress);box.append(importer);
+ importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importLabel,importBtn,progress);box.append(importer);
  importBtn.addEventListener('click',async()=>{
   const find=(...names)=>data.headers.findIndex(h=>names.includes(h.toLowerCase().trim().replace(/\\s+/g,'_')));
   const idx={name:find('produktname','artikelbezeichnung','bezeichnung','artikel','produkt','name'),brand:find('marke','brand'),ean:find('ean','ean_gtin','gtin'),mpn:find('mpn','artikelnummer','herstellerartikelnummer'),qty:find('menge','anzahl','verfuegbare_menge','stückzahl','postenmenge'),price:find('ek','ek_netto','preis_netto_eur','einkaufspreis','ek_pro_stueck_netto','ek_pro_stück_netto','ek_stueck_netto'),basis:find('preisbasis','preiseinheit'),total:find('posten_gesamt_netto','ek_gesamt_netto','ek_gesamt','posten_gesamt','gesamt_ek','einkaufswert_gesamt'),market:find('b2c_marktpreis_inkl_versand','marktpreis_inkl_versand','b2c_marktpreis','b2c_marktpreis_pro_stück_inkl_versand','marktpreis_gesamtpreis'),sale:find('kalkulierter_vk','kalkulierter_vk_inkl_versand','vk_kalkulatorisch','b2c_vk_inkl_versand','vk_inkl_versand','verkaufspreis'),shipping:find('versandkosten','versandkosten_pro_stueck','b2c_versandkosten'),marketing:find('marketingbudget','marketingbudget_gesamt'),demand:find('nachfrage','nachfragesignal','nachfrage_(simulation)'),competition:find('wettbewerb','wettbewerber_(simulation)'),condition:find('zustand'),category:find('kategorie'),risk:find('risiko','risiken'),startBid:find('startpreis_gesamt_eur','startgebot','startpreis','aufrufpreis'),lot:find('positionsnummer','losnummer'),source:find('quelle','quellenlink')};
@@ -827,7 +828,7 @@ function renderScannerPreview(data){
   try{
    const {data:session}=await supabaseClient.auth.getSession();
    if(!session?.session?.access_token)throw Error('Bitte zuerst als Einkäufer anmelden.');
-   const {data:result,error}=await supabaseClient.functions.invoke('albert-scanner-import',{body:{filename:scannerData?.filename||'Bestandsliste.csv',supplier_name:supplier.value.trim(),rows}});
+   const {data:result,error}=await supabaseClient.functions.invoke('albert-scanner-import',{body:{filename:scannerData?.filename||'Bestandsliste.csv',supplier_name:supplier.value.trim(),deal_label:importLabel.value.trim(),rows}});
    if(error||!result?.success){cachedDealSnapshot=null;throw Error((result?.error||error?.message||'Import unvollständig')+(result?.created?' · '+result.created+' Deals bereits gespeichert. Bitte vor erneutem Import prüfen.':''));}
    progress.textContent=result.created+' Deals übernommen · '+result.skipped+' bereits vorhanden. Öffne ☆ Unbewertet …';
    activeDealView='UNRATED';cachedDealSnapshot=null;closeListScanner();await fetchDeals();
@@ -1764,6 +1765,32 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
     let activeSpuersinnFilter = null;
+    let activeDealLabelFilter = '';
+    const selectedDealLabelIds = new Set();
+    const dealLabelChip = deal => '<button type="button" data-edit-deal-label="'+escapeHtml(deal.id)+'" title="Label vergeben, ändern oder entfernen" class="ml-2 inline-flex align-middle rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:border-cyan-400 hover:text-cyan-700">🏷 '+escapeHtml(deal.deal_label||'+ Label')+'</button>';
+    async function saveDealLabels(ids,label){
+      const {data:session}=await supabaseClient.auth.getSession();
+      if(!session?.session?.access_token)throw Error('Bitte zuerst anmelden.');
+      const {error}=await supabaseClient.from('discoveries').update({deal_label:label||null}).in('id',ids);
+      if(error)throw Error(error.message);
+      selectedDealLabelIds.clear();cachedDealSnapshot=null;await fetchDeals();
+    }
+    document.getElementById('deals-container').addEventListener('change',event=>{
+      if(event.target.matches('[data-label-filter]')){activeDealLabelFilter=event.target.value;selectedDealLabelIds.clear();fetchDeals(true);}
+      if(event.target.matches('[data-label-select]')){const id=event.target.dataset.labelSelect;if(event.target.checked)selectedDealLabelIds.add(id);else selectedDealLabelIds.delete(id);const count=document.querySelector('[data-label-selected-count]');if(count)count.textContent=selectedDealLabelIds.size+' markiert';}
+    });
+    document.getElementById('deals-container').addEventListener('click',async event=>{
+      const edit=event.target.closest('[data-edit-deal-label]');
+      const bulk=event.target.closest('[data-label-bulk]');
+      if(!edit&&!bulk)return;
+      event.preventDefault();event.stopPropagation();
+      const ids=edit?[edit.dataset.editDealLabel]:[...selectedDealLabelIds];if(!ids.length){alert('Bitte zuerst Deals markieren.');return;}
+      const current=edit?(window.albertDealsById?.get(String(ids[0]))?.deal_label||''):'';
+      const input=prompt(ids.length===1?'Label eingeben (leer = entfernen):':'Label für '+ids.length+' Deals (leer = entfernen):',current);
+      if(input===null)return;
+      const label=input.trim();if(label.length>48){alert('Maximal 48 Zeichen.');return;}
+      try{await saveDealLabels(ids,label);}catch(e){alert('Label konnte nicht gespeichert werden: '+e.message);}
+    });
     document.getElementById('deals-container').addEventListener('click', event => {
       const link = event.target.closest('[data-spuersinn-kind]');
       if (link) {
@@ -2739,20 +2766,23 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="'+escapeHtml(info.note)+' · Alle passenden Deals anzeigen">'+escapeHtml(compact)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
       };
       learningDealIndex = deals || [];
-      const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
+      const gradeDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
+      const availableLabels=[...new Set(gradeDeals.map(d=>String(d.deal_label||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+      const visibleDeals = activeDealLabelFilter ? gradeDeals.filter(d=>d.deal_label===activeDealLabelFilter) : gradeDeals;
+      const labelToolbar='<div class="mb-3 flex flex-wrap items-center gap-2 text-xs"><label for="deal-label-filter" class="text-slate-500">🏷 Label</label><select id="deal-label-filter" data-label-filter class="max-w-[210px] rounded-lg border border-slate-200 bg-white px-2 py-1.5"><option value="">Alle Labels</option>'+availableLabels.map(v=>'<option value="'+escapeHtml(v)+'" '+(v===activeDealLabelFilter?'selected':'')+'>'+escapeHtml(v)+'</option>').join('')+'</select><button type="button" data-label-bulk class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 hover:border-cyan-400">Markierte labeln</button><span data-label-selected-count class="text-slate-400">'+selectedDealLabelIds.size+' markiert</span></div>';
       const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between gap-3"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><div class="flex items-center gap-3"><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span>' + (activeSpuersinnFilter ? '<button type="button" data-spuersinn-clear class="rounded-lg border border-cyan-200 px-2.5 py-1 text-xs text-cyan-800 hover:bg-cyan-50">Filter entfernen ×</button>' : '') + '</div></div>';
 
       if (!visibleDeals.length) {
 
-        container.innerHTML = viewHeading + '<div class="text-center py-20 text-slate-400 text-sm bg-white border border-slate-200 rounded-2xl">Keine Deals in dieser Ablage.</div>';
+        container.innerHTML = viewHeading + labelToolbar + '<div class="text-center py-20 text-slate-400 text-sm bg-white border border-slate-200 rounded-2xl">Keine Deals in dieser Ablage.</div>';
 
         return;
 
       }
 
 
-      container.innerHTML = viewHeading + visibleDeals.map((deal, index) => {
+      container.innerHTML = viewHeading + labelToolbar + visibleDeals.map((deal, index) => {
 
         // Discovery-first interface: analysis is deferred until the buyer selects Deep Dive.
         if(!isDealExpanded(deal.id, activeDealView)){
@@ -2789,7 +2819,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
           return '<article id="deal-card-'+id+'" data-scanner-import="'+String(deal.hunt_origin==='SCANNER'||String(deal.offer_url||'').startsWith('scanner://import/'))+'" data-deal-origin="'+(deal.hunt_origin==='SOFORT'?'sofort':'other')+'" class="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow '+(deal.hunt_origin==='SOFORT'?'deal-sofort-highlight border-[#24a1d6]':'border-slate-200')+'">'+
-            '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
+            '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+dealLabelChip(deal)+'<label class="ml-2 text-[10px] text-slate-400"><input type="checkbox" data-label-select="'+id+'" '+(selectedDealLabelIds.has(String(deal.id))?'checked':'')+' aria-label="Deal für Sammellabel markieren"> auswählen</label>'+
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<div class="deal-header-spuersinn">'+spuersinnHtml(deal)+'</div></div>'+
             '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
@@ -2909,7 +2939,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
             <div class="deal-header deal-header-refined">
               <div class="deal-header-primary">
-                <h2 class="deal-product-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</h2>
+                <h2 class="deal-product-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</h2>${dealLabelChip(deal)}<label class="ml-2 text-[10px] text-slate-400"><input type="checkbox" data-label-select="${dealId}" ${selectedDealLabelIds.has(String(deal.id))?'checked':''} aria-label="Deal für Sammellabel markieren"> auswählen</label>
                 <div class="deal-product-subtitle">
                   <span>${escapeHtml(categoryName(deal))}</span>
                   <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
