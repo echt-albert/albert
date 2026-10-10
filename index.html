@@ -705,7 +705,7 @@ function renderScannerPreview(data){
    const {data:session}=await supabaseClient.auth.getSession();
    if(!session?.session?.access_token)throw Error('Bitte zuerst als Einkäufer anmelden.');
    const {data:result,error}=await supabaseClient.functions.invoke('albert-scanner-import',{body:{filename:scannerData?.filename||'Bestandsliste.csv',supplier_name:supplier.value.trim(),rows}});
-   if(error||!result?.success)throw Error(result?.error||error?.message||'Import fehlgeschlagen');
+   if(error||!result?.success){cachedDealSnapshot=null;throw Error((result?.error||error?.message||'Import unvollständig')+(result?.created?' · '+result.created+' Deals bereits gespeichert. Bitte vor erneutem Import prüfen.':''));}
    progress.textContent=result.created+' Deals übernommen · '+result.skipped+' bereits vorhanden. Öffne ☆ Unbewertet …';
    activeDealView='UNRATED';cachedDealSnapshot=null;closeListScanner();await fetchDeals();
   }catch(e){progress.textContent='Import nicht abgeschlossen: '+(e.message||String(e));}
