@@ -332,6 +332,14 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .deal-accordion-body{padding:12px!important}
     @media(max-width:550px){.deal-workspace .deal-accordion-item>summary{min-height:44px!important;padding:9px 10px!important}}
 
+    /* Geöffnete Akte: Titel und Zurück-Button in derselben obersten Zeile. */
+    .deal-workspace .dealakte-top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+    .deal-workspace .dealakte-top-title{font-size:18px;font-weight:700;line-height:1.3;color:#1e293b;min-width:0}
+    .deal-workspace .deal-header-primary>.deal-product-title{display:none}
+    .deal-compact .dealakte-top-title{display:none}
+    .deal-compact .dealakte-top-row{display:none}
+    @media(max-width:550px){.deal-workspace .dealakte-top-title{font-size:16px}}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
@@ -2765,7 +2773,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         return `
 
           <article id="deal-card-${dealId}" data-scanner-import="${String(deal.offer_url||'').startsWith('scanner://import/')}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#24a1d6] border-[#24a1d6] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            <div class="mb-3 flex justify-end"><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
+            <div class="dealakte-top-row"><div class="dealakte-top-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</div><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
             <!-- DEAL HEADER -->
 
             <div class="deal-header deal-header-refined">
