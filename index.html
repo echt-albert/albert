@@ -1218,6 +1218,7 @@
         if (!current) return;
         if (data?.status === 'ready' && data.portrait) {
           portraitCache.set(key, data.portrait);
+          try { localStorage.setItem('albert-portrait-v1:' + key, data.portrait); } catch (_) {}
           current.textContent = data.portrait;
         } else if (data?.status === 'pending') {
           showAiRetry(current, 'Produktporträt wird noch verarbeitet.', () => loadProductPortrait(key));
@@ -1320,6 +1321,9 @@
       const deal=window.albertDealsById?.get(String(id))||{};
       const context=kind==='portrait'?(portraitCache.get(String(id))||plainProductDescription(deal)||'Noch keine Analyse'):'Zielgruppenanalyse: '+(audienceCache.has(String(id))?card.parentElement.querySelector('[id^="target-audience-"]')?.textContent||'vorhanden':'Noch keine Analyse');
       const messages=followupMessages(id,kind);
+      // Snapshot the original portrait separately from the conversational answer.
+      const portraitNode=kind==='portrait'?document.getElementById('product-portrait-'+id):null;
+      const originalPortrait=portraitNode?.textContent||'';
       const prompt='Du beantwortest eine konkrete Rückfrage zu einem B2C-Produkt. Produkt: '+JSON.stringify({product_name:deal.product_name,brand:deal.brand,ean:deal.ean_gtin,mpn:deal.mpn})+'. Kontext: '+String(context).slice(0,2400)+'. Frühere Rückfragen: '+JSON.stringify(messages.slice(-6)).slice(0,3500)+'. Aktuelle Frage: '+question+'. Antworte auf Deutsch, maximal 200 Wörter. Nutze nur bereitgestellte Daten und allgemeines Modellwissen. Keine Live-Webrecherche; behaupte keine verifizierten Quellen, Preise oder Verkaufszahlen. Kennzeichne Vermutungen klar. Wenn externe Fakten nötig sind, sage ausdrücklich, dass diese nicht verifiziert wurden.';
       button.disabled=true;button.textContent='Albert antwortet …';
       try {
@@ -1328,6 +1332,8 @@
         const answer=String(data.choices?.[0]?.message?.content||'').trim();if(!answer)throw Error('Keine Antwort');
         const updated=[...messages,{role:'user',content:question},{role:'assistant',content:answer}].slice(-24);
         localStorage.setItem(followupKey(id,kind),JSON.stringify(updated));input.value='';renderFollowups(id);
+        // A follow-up must never replace the source portrait.
+        if(portraitNode && originalPortrait && portraitNode.textContent!==originalPortrait) portraitNode.textContent=originalPortrait;
       }catch(e){alert('Albert konnte die Rückfrage nicht beantworten. Bitte erneut versuchen.');}
       finally {button.disabled=false;button.textContent='Fragen ↗';}
     });
@@ -1336,6 +1342,9 @@
       const key = String(id);
       const p = document.getElementById('product-portrait-' + key);
       const a = document.getElementById('target-audience-' + key);
+      if (p && !portraitCache.has(key)) {
+        try { const saved=localStorage.getItem('albert-portrait-v1:' + key); if(saved) portraitCache.set(key,saved); } catch (_) {}
+      }
       if (p && portraitCache.has(key)) p.textContent = portraitCache.get(key);
       if (a && audienceCache.has(key)) a.replaceChildren(...audienceCache.get(key).map(n => n.cloneNode(true)));
       updateAiButtons(key);
