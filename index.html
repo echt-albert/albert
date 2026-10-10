@@ -81,7 +81,7 @@
     @keyframes albert-spin { to { transform: rotate(360deg); } }
     .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
     .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
-    .deal-compact > :not(.deal-header):not(.deal-division-nav) { display:none !important; }
+    .deal-compact > :not(.deal-header):not(.deal-division-nav):not(.deal-facts) { display:none !important; }
     .deal-compact .deal-header { margin-bottom:0 !important; }
     .deal-compact-summary { display:none; }
     .deal-compact .deal-compact-summary { display:none; }
@@ -150,6 +150,15 @@
 
 .deal-divisions > .division-workcard{padding:18px;border:1px solid #dce4ed;border-top:3px solid var(--accent,#94a3b8);background:#fff;display:flex;flex-direction:column;gap:12px;min-width:0}.division-workcard .division-title{font-size:15px;font-weight:750;line-height:1.35;color:#1e293b}.division-workcard .division-subtitle{font-size:11px;color:#64748b;line-height:1.5;margin-top:4px}.division-workcard .division-action{display:block;margin-top:auto;padding:10px 12px;text-align:center;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;font-size:12px;font-weight:700;color:#334155;cursor:pointer}.division-workcard .division-action:hover{background:#f1f5f9}
 
+/* Kaufmännische Eckdaten der eingeklappten und geöffneten Deal-Akte */
+.deal-facts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0 14px}
+.deal-fact{min-width:0;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px 11px}
+.deal-fact-label{display:block;color:#64748b;font-size:10px;font-weight:600;margin-bottom:5px}
+.deal-fact-value{display:block;color:#1e293b;font-size:12px;font-weight:650;overflow-wrap:anywhere;line-height:1.35}
+.deal-fact-hint{display:block;color:#64748b;font-size:10px;margin-top:3px}
+.deal-compact>.deal-facts{display:grid!important}
+@media(max-width:950px){.deal-facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:550px){.deal-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Einheitliche Ausrichtung für alle Deal-Akten */
 .deal-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:start}
 .deal-header-status{grid-column:1/-1;grid-row:1;width:auto!important;justify-content:flex-start!important;margin:0!important}
@@ -1715,6 +1724,15 @@
 
             </div>
 
+
+            <!-- FÜNF KAUFMÄNNISCHE ECKDATEN -->
+            <div class="deal-facts" aria-label="Posten auf einen Blick">
+              <div class="deal-fact"><span class="deal-fact-label">Posten</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' Stk.' : 'Menge unbekannt'}</strong></div>
+              <div class="deal-fact"><span class="deal-fact-label">Inhalt</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' × ' : ''}${escapeHtml(deal.product_name || 'Artikel unbekannt')}</strong><small class="deal-fact-hint">Verpackungseinheiten nicht bestätigt</small></div>
+              <div class="deal-fact"><span class="deal-fact-label">EK · ${escapeHtml(deal.currency||'EUR')}</span><strong class="deal-fact-value">${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2))+' '+(deal.currency==='EUR'||!deal.currency?'€':escapeHtml(deal.currency)) : 'Unbekannt'}</strong><small class="deal-fact-hint">Preisangabe aus Angebot · Bezugsbasis prüfen</small></div>
+              <div class="deal-fact"><span class="deal-fact-label">B2C-VK · je Stück inkl. Versand</span><strong class="deal-fact-value">${b2cLowest==null ? 'Noch unbekannt' : escapeHtml((b2cLowest*0.8).toFixed(2))+' €'}</strong><small class="deal-fact-hint">${b2cLowest==null ? 'Kein verifizierter Gesamtpreis' : '80 % des günstigsten verifizierten Gesamtpreises'}</small></div>
+              <div class="deal-fact"><span class="deal-fact-label">Anbieter</span><strong class="deal-fact-value">${escapeHtml(deal.supplier_name || 'Unbekannt')}</strong>${offerUrl ? '<a class="deal-fact-hint text-amber-800 underline" href="'+offerUrl+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>' : ''}</div>
+            </div>
 
             <!-- SIEBEN ABTEILUNGEN: in jeder Ansicht direkt erreichbar -->
             <nav class="deal-division-nav" aria-label="Abteilungen der Deal-Akte">
