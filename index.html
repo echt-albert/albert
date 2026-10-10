@@ -1771,7 +1771,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let activeDealLabelFilter = '';
     const selectedDealLabelIds = new Set();
     const dealLabelChip = deal => '<button type="button" data-edit-deal-label="'+escapeHtml(deal.id)+'" title="Label auswählen oder ändern" class="inline-flex max-w-none shrink-0 items-center whitespace-nowrap rounded-full border '+(deal.deal_label?'border-cyan-200 bg-cyan-50 text-cyan-800':'border-dashed border-slate-300 bg-white text-slate-400')+' px-3 py-1 text-[11px] font-medium hover:border-cyan-500 hover:bg-cyan-50">'+escapeHtml(deal.deal_label||'+ Label')+'</button>';
-    const dealCategoryChip = deal => '<button type="button" onclick="openCategoryEditor(\\''+escapeHtml(String(deal.id))+'\\')" title="Kategorie ändern" class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-600 hover:border-slate-400">'+escapeHtml(categoryName(deal))+'</button>';
+    const dealCategoryChip = deal => '<button type="button" data-edit-deal-category="'+escapeHtml(String(deal.id))+'" title="Kategorie ändern" class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-600 hover:border-slate-400">'+escapeHtml(categoryName(deal))+'</button>';
     const dealHeaderChips = deal => '<div class="flex max-w-full flex-wrap items-center justify-end gap-2">'+dealCategoryChip(deal)+dealLabelChip(deal)+'</div>';
     let knownDealLabels=[];
     function labelPicker(initial='',count=1){
@@ -1828,6 +1828,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       syncBulkLabelBar();
     });
     document.getElementById('deals-container').addEventListener('click',async event=>{
+      const categoryEdit=event.target.closest('[data-edit-deal-category]');
+      if(categoryEdit){event.preventDefault();event.stopPropagation();openCategoryEditor(categoryEdit.dataset.editDealCategory);return;}
       const edit=event.target.closest('[data-edit-deal-label]');
       const bulk=event.target.closest('[data-label-bulk]');
       if(!edit&&!bulk)return;
