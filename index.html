@@ -295,6 +295,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       </div>
 
+      <button type="button" onclick="toggleSourceRadar()" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Deal-Ablage">
         <button type="button" data-view="SOFORT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>⚡ Sofort-Jagd</span><span data-count="SOFORT" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="WATCH" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
@@ -392,6 +393,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
         <div class="min-w-0">
 
+          <section id="source-panel" class="hidden mb-6 bg-white border rounded-2xl p-6"><div class="flex justify-between"><div><h2 class="font-semibold text-xl">🛰️ Quellenradar</h2><p class="text-xs text-slate-500 mt-2">Lieferanten aus Alberts bisherigen Recherchen. Du entscheidest.</p></div><button onclick="toggleSourceRadar(false)" class="text-xs">Schließen ×</button></div><p class="text-xs bg-amber-50 p-3 rounded-lg mt-4">Pilotversion: Anbieter werden aus bestehenden Deals übernommen. Neue Lieferanten im Web suchen und automatisches Beobachten sind noch nicht angeschlossen. Entscheidungen werden nur in diesem Browser gespeichert.</p><input id="source-search" oninput="renderSourceRadar()" placeholder="Quelle suchen …" class="w-full border rounded-lg p-3 text-xs mt-4"><div id="source-results" class="space-y-3 mt-4"></div></section>
           <div id="deals-container" class="space-y-6">
 
             <div class="text-center py-24 text-slate-400 text-sm mono">
@@ -498,6 +500,20 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <!-- ===================================================== -->
 
   <script>
+
+
+let radarDeals=[];
+function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
+function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
+function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);if(show)renderSourceRadar()}
+function renderSourceRadar(){
+const out=document.getElementById('source-results');if(!out)return;
+const m=new Map();for(const d of radarDeals){const name=String(d.supplier_name||'').trim();if(!name||/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(name))continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:''});const x=m.get(key);x.count++;if(!x.url&&d.offer_url)x.url=typeof safeUrl==='function'?safeUrl(d.offer_url):''}
+const rows=[...m.values()].sort((a,b)=>b.count-a.count);document.getElementById('source-count').textContent=rows.length;
+const q=(document.getElementById('source-search').value||'').toLocaleLowerCase('de');const state=radarState();const labels={call:'📞 Anrufen',mail:'✉️ Mailen',watch:'👁️ Beobachten',check:'📋 Angebot prüfen',reject:'✕ Verwerfen'};
+out.innerHTML=rows.filter(x=>x.name.toLocaleLowerCase('de').includes(q)).map(x=>'<article class="border rounded-xl p-4"><div class="flex justify-between gap-3"><div><strong class="text-sm">'+escapeHtml(x.name)+'</strong><p class="text-xs text-slate-500">'+x.count+' Deals · '+(labels[state[x.key]?.action]||'Noch offen')+'</p></div>'+(x.url?'<a class="text-xs underline" href="'+escapeHtml(x.url)+'" target="_blank" rel="noopener noreferrer">Fundstelle ↗</a>':'')+'</div><div class="flex gap-2 flex-wrap mt-3">'+Object.entries(labels).map(([a,l])=>'<button type="button" data-radar-key="'+escapeHtml(x.key)+'" data-radar-action="'+a+'" class="border rounded-lg px-3 py-2 text-xs '+(state[x.key]?.action===a?'bg-slate-900 text-white':'hover:bg-slate-50')+'">'+l+'</button>').join('')+'</div></article>').join('')||'<p class="text-xs text-slate-500">Noch keine Quellen vorhanden.</p>';
+out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click',()=>radarSave(b.dataset.radarKey,b.dataset.radarAction)));
+}
 
     // =======================================================
     // SUPABASE
@@ -1925,6 +1941,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       }
 
+      radarDeals=deals||[];renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
       const { data: savedCategories, error: categoryError } = await supabaseClient
         .from('deal_category_labels').select('discovery_id,category');
