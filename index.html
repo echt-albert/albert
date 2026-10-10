@@ -284,6 +284,32 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .deal-overview-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
     @media(max-width:800px){.deal-workspace .deal-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+  
+    /* Dealakte: unabhängige, aufklappbare Werkzeugbereiche */
+    .deal-workspace .deal-division-nav{display:none!important}
+    .deal-workspace .deal-divisions{display:none!important}
+    .deal-accordion{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+    .deal-accordion-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:5px 0 2px}
+    .deal-accordion-toolbar strong{font-size:13px;color:#334155}
+    .deal-accordion-toolbar button{font-size:11px;color:#1685b4;padding:5px 8px;border-radius:7px}
+    .deal-accordion-toolbar button:hover{background:#eefaff}
+    .deal-accordion-item{border:1px solid #dbe3eb;border-radius:12px;background:white;overflow:hidden}
+    .deal-accordion-item[open]{border-color:#24a1d6;box-shadow:inset 3px 0 0 #24a1d6}
+    .deal-accordion-item>summary{list-style:none;display:flex;align-items:center;gap:13px;padding:15px 18px;cursor:pointer;min-height:67px}
+    .deal-accordion-item>summary::-webkit-details-marker{display:none}
+    .deal-accordion-item>summary:hover{background:#f5fbfe}
+    .deal-accordion-item[open]>summary{background:#eefaff;border-bottom:1px solid #dbeef8}
+    .deal-accordion-number{font:600 12px monospace;color:#1685b4;min-width:26px}
+    .deal-accordion-title{display:flex;flex-direction:column;gap:3px;min-width:105px}
+    .deal-accordion-title strong{font-size:14px;color:#172b3c}
+    .deal-accordion-title small{font-size:11px;color:#64748b}
+    .deal-accordion-status{margin-left:auto;font-size:11px;color:#64748b;text-align:right}
+    .deal-accordion-chevron{font-size:18px;color:#1685b4;transition:transform .15s}
+    .deal-accordion-item[open] .deal-accordion-chevron{transform:rotate(90deg)}
+    .deal-accordion-body{padding:18px}
+    .deal-accordion-body>.deal-division-section{display:flex!important;width:100%;margin:0!important;border:0!important;box-shadow:none!important;padding:0!important}
+    @media(max-width:550px){.deal-accordion-status{display:none}.deal-accordion-body{padding:12px}}
+
   </style>
 </head>
 
@@ -1522,6 +1548,73 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       fetchDeals();
     });
 
+    // Accordion-Zustand pro Deal: unabhängig voneinander und über Re-Renders erhalten.
+    const dealAccordionState = new Map();
+    function initDealAccordions() {
+      document.querySelectorAll('.deal-workspace[id^="deal-card-"]').forEach(card=>{
+        if(card.querySelector('.deal-accordion'))return;
+        const id=card.id.replace('deal-card-','');
+        const nav=card.querySelector('.deal-division-nav');
+        const divisions=card.querySelector('.deal-divisions');
+        if(!nav||!divisions)return;
+        const tools=[...nav.querySelectorAll('.deal-division-link')];
+        const wrapper=document.createElement('div');
+        wrapper.className='deal-accordion';
+        const toolbar=document.createElement('div');
+        toolbar.className='deal-accordion-toolbar';
+        toolbar.innerHTML='<strong>Werkzeuge & Ergebnisse</strong><span><button type="button" data-accordion-all="open">Alle öffnen</button><button type="button" data-accordion-all="close">Alle schließen</button></span>';
+        wrapper.append(toolbar);
+        const saved=dealAccordionState.get(id)||new Set();
+        tools.forEach(btn=>{
+          const key=btn.dataset.dealDivision;
+          const section=divisions.querySelector('[data-division-section="'+key+'"]');
+          if(!section)return;
+          const details=document.createElement('details');
+          details.className='deal-accordion-item';
+          details.dataset.accordionSection=key;
+          details.dataset.dealId=id;
+          details.open=saved.has(key);
+          const number=btn.querySelector('.deal-division-index')?.textContent?.slice(0,2)||'';
+          const title=btn.querySelector('strong')?.textContent||key;
+          const subtitle=btn.querySelector('small')?.textContent||'';
+          const summary=document.createElement('summary');
+          const index=document.createElement('span');index.className='deal-accordion-number';index.textContent=number;
+          const label=document.createElement('span');label.className='deal-accordion-title';
+          const strong=document.createElement('strong');strong.textContent=title;
+          const small=document.createElement('small');small.textContent=subtitle;
+          label.append(strong,small);
+          const status=document.createElement('span');status.className='deal-accordion-status';status.textContent=btn.querySelector('.deal-division-index')?.textContent?.includes('●')?'Bereits bearbeitet':'Noch offen';
+          const chevron=document.createElement('span');chevron.className='deal-accordion-chevron';chevron.textContent='›';
+          summary.append(index,label,status,chevron);
+          const body=document.createElement('div');body.className='deal-accordion-body';
+          section.classList.remove('deal-workspace-active');
+          body.append(section);
+          details.append(summary,body);
+          details.addEventListener('toggle',()=>{
+            const current=dealAccordionState.get(id)||new Set();
+            if(details.open)current.add(key);else current.delete(key);
+            dealAccordionState.set(id,current);
+          });
+          wrapper.append(details);
+        });
+        divisions.before(wrapper);
+      });
+    }
+    document.getElementById('deals-container').addEventListener('click',event=>{
+      const button=event.target.closest('[data-accordion-all]');
+      if(!button)return;
+      const card=button.closest('.deal-workspace');
+      const id=card?.id.replace('deal-card-','');
+      if(!id)return;
+      const open=button.dataset.accordionAll==='open';
+      const keys=new Set();
+      card.querySelectorAll('.deal-accordion-item').forEach(details=>{
+        details.open=open;
+        if(open)keys.add(details.dataset.accordionSection);
+      });
+      dealAccordionState.set(id,keys);
+    });
+
     // Offen/geschlossen pro Deal merken, auch bei automatischem Refresh.
     const dealExpansion = new Map();
     function isDealExpanded(id, view) {
@@ -1740,8 +1833,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       const card=document.getElementById('deal-card-'+id);
       if(!card)return;
       if(card.classList.contains('deal-compact'))toggleDealCard(id);
-      card.querySelectorAll('.deal-division-link').forEach(b=>b.setAttribute('aria-current',String(b===button)));
-      card.querySelectorAll('[data-division-section]').forEach(el=>el.classList.toggle('deal-workspace-active',el.dataset.divisionSection===section));
+      const accordion=card.querySelector('.deal-accordion-item[data-accordion-section="'+section+'"]');
+      if(accordion)accordion.open=true;
       const target=card.querySelector('[data-division-section="'+section+'"]');
       if(target){target.scrollIntoView({behavior:'smooth',block:'start'});target.focus({preventScroll:true});}
     });
@@ -2829,6 +2922,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       }).join('');
       // Market checks are buyer-triggered, never automatic.
 
+      initDealAccordions();
       restoreSimpleCalc();
       // Offene Deal-Kacheln nach jedem Re-Render wiederherstellen.
       for (const deal of visibleDeals) {
