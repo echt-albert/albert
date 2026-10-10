@@ -1373,7 +1373,20 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
     const quickMarketCache=new Map(),quickMarketInFlight=new Set();
-    function renderQuickMarket(id,data){
+    function updateCardMarketPrice(id,data){
+      const node=document.querySelector('[data-card-market-price="'+CSS.escape(String(id))+'"]');
+      if(!node)return;
+      const price=Number(data?.low_eur||data?.cheapest_price_eur);
+      if(data?.success&&Number.isFinite(price)&&price>0){
+        node.textContent=price.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+        node.classList.remove('text-slate-500');
+        node.title='KI-Preisindikation · ungeprüft; kein verifizierter B2C-Gesamtpreis inkl. Versand';
+      }else if(data?.success===false){
+        node.textContent='—';
+      }
+    }
+    function renderQuickMarket(id,data){      updateCardMarketPrice(id,data);
+
       const el=document.querySelector('[data-quick-market="'+id+'"]');if(!el)return;
       const eur=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
       const deal=window.albertDealsById?.get(String(id))||{};
@@ -1392,6 +1405,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if(quickMarketInFlight.has(id))continue;
         const el=document.querySelector('[data-quick-market="'+id+'"]');
         if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span>';
+        const cardPrice=document.querySelector('[data-card-market-price="'+CSS.escape(id)+'"]');
+        if(cardPrice&&!quickMarketCache.has(id))cardPrice.textContent='Prüfung läuft …';
         quickMarketInFlight.add(id);
         fetch(SUPABASE_URL+'/functions/v1/albert-quick-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({product:{product_name:deal.product_name,brand:deal.brand,ean_gtin:deal.ean_gtin,mpn:deal.mpn}}),signal:AbortSignal.timeout(28000)})
           .then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||"HTTP "+r.status);return data;}).then(data=>{if(data?.success&&(data.low_eur||data.cheapest_price_eur))quickMarketCache.set(id,data);renderQuickMarket(id,data);})
@@ -2419,9 +2434,10 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<div class="deal-header-spuersinn">'+spuersinnHtml(deal)+'</div></div>'+
-            '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
+            '<div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
             '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
+            '<div><span class="block text-[10px] text-slate-500">B2C-Marktpreis (ungeprüft)</span><strong data-card-market-price="'+id+'" class="text-slate-500">'+(quickMarketCache.has(id)&&quickMarketCache.get(id)?.success&&Number(quickMarketCache.get(id).low_eur||quickMarketCache.get(id).cheapest_price_eur)>0?escapeHtml(Number(quickMarketCache.get(id).low_eur||quickMarketCache.get(id).cheapest_price_eur).toLocaleString('de-DE',{style:'currency',currency:'EUR'})):'—')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
             '<div class="deal-rating-with-akte">'+starWidget(id)+'<div class="deal-inline-actions" role="group" aria-label="Deal-Aktionen">'+
