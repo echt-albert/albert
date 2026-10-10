@@ -366,6 +366,19 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 #deal-navigation .deal-view:focus-visible,#list-scanner-nav:focus-visible{outline:2px solid #24a1d6;outline-offset:2px}
 #list-scanner-dropzone{border-radius:12px!important;border-width:1px!important}
 #list-scanner-page button,#list-scanner-dropzone .rounded-full{border-radius:8px!important}
+
+/* Deal navigation: understated enterprise look, no orange card borders. */
+#deal-navigation{display:flex;flex-direction:column;gap:3px}
+#deal-navigation .deal-view{height:39px;min-height:39px;padding:0 12px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;color:#475569!important;font-size:12px!important;font-weight:500!important;box-shadow:none!important;outline-offset:2px}
+#deal-navigation .deal-view:hover{background:#f1f5f9!important;color:#0f172a!important;border-color:transparent!important}
+#deal-navigation .deal-view[data-view="ALL"]{margin-top:7px;border-top:1px solid #e2e8f0!important;border-radius:0!important;padding-top:7px!important;height:46px}
+#deal-navigation .deal-view[data-view="CLOSED"]{margin-top:5px}
+#deal-navigation .deal-view[data-view="ALL"]:hover{border-radius:7px!important}
+#deal-navigation .deal-view[aria-pressed="true"],#deal-navigation .deal-view[data-active="true"],#deal-navigation .deal-view.is-active{background:#eaf4f9!important;color:#075985!important;border-color:transparent!important;box-shadow:inset 3px 0 0 #24a1d6!important;font-weight:650!important}
+#deal-navigation .deal-view[data-view="ALL"][aria-pressed="true"],#deal-navigation .deal-view[data-view="ALL"].is-active{border-top-color:transparent!important;border-radius:7px!important}
+#deal-navigation .deal-view [data-count]{color:#64748b;font-variant-numeric:tabular-nums;font-weight:500}
+#deal-navigation .deal-view .text-amber-500{color:#64748b!important}
+#deal-navigation .deal-view .text-slate-300{color:#cbd5e1!important}
 </style>
 </head>
 
