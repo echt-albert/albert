@@ -1724,12 +1724,12 @@
               rel="noopener noreferrer"
               class="division-action"
             >
-              Angebot öffnen ↗
+              Öffnen
             </a>
           `
           : `
             <span class="division-action division-action-unavailable">
-              Keine Angebots-URL
+              Nicht verfügbar
             </span>
           `;
 
@@ -1901,7 +1901,7 @@
 
               <!-- CIPHER -->
 
-              <div data-division-section="cipher" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl"--accent:#64748b" class="division-workcard rounded-xl">
+              <div data-division-section="cipher" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -1959,13 +1959,13 @@
                   ${(deal.cipher_research?.results||[]).slice(0,4).map(hit=>'<div class="mt-2"><a href="'+safeUrl(hit.url)+'" target="_blank" rel="noopener noreferrer" class="text-sky-800 underline break-words">'+escapeHtml(hit.title||'Recherchehinweis')+' ↗</a>'+(hit.ean_mentioned||hit.mpn_mentioned?'<span class="text-amber-700"> · Kennung im Suchtreffer</span>':'')+'</div>').join('')}
                   ${deal.cipher_research?.checked_at?'<p class="mt-2 text-amber-800">Suchtreffer sind keine verifizierten Produkt- oder Compliance-Nachweise.</p>':''}
                 </div>
-                <button type="button" data-cipher-search="${deal.id}" ${activeCipherResearch.has(String(deal.id))?"disabled":""} class="division-action disabled:opacity-50">${activeCipherResearch.has(String(deal.id))?'◌ Recherche läuft …':deal.cipher_research?.checked_at?'↻ Recherche':'Recherche'}</button>
+                <button type="button" data-cipher-search="${deal.id}" ${activeCipherResearch.has(String(deal.id))?"disabled":""} class="division-action disabled:opacity-50">${activeCipherResearch.has(String(deal.id))?'Prüfung läuft':'Identität prüfen'}</button>
               </div>
 
 
               <!-- ORACLE -->
 
-              <div data-division-section="oracle" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl"--accent:#0891b2" class="division-workcard rounded-xl">
+              <div data-division-section="oracle" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -1992,8 +1992,8 @@
                     return '<div class="flex justify-between items-start gap-2 mono text-[11px]"><span class="text-cyan-700">#'+(idx+1)+' <a href="'+safeUrl(offer.url)+'" target="_blank" rel="noopener noreferrer" class="underline hover:text-cyan-900">'+escapeHtml(offer.merchant)+' ↗</a></span><span class="text-right text-slate-700">'+escapeHtml(total)+'</span></div>';
                   }).join('')}
                   ${deal.market_deep_dive?.checked_at ? '<p class="text-[10px] text-amber-700">Suchtreffer, noch nicht unabhängig verifiziert · '+escapeHtml(new Date(deal.market_deep_dive.checked_at).toLocaleDateString('de-DE'))+'</p>' : '<p class="text-[10px] text-slate-400">Noch keine gezielte Händlerrecherche.</p>'}
-                  <button type="button" data-oracle-search="${deal.id}" ${activeOracleSearch.has(String(deal.id))?'disabled':''} class="mt-2 w-full rounded-lg border border-cyan-200 bg-white px-2 py-2 text-[11px] font-semibold text-cyan-800 hover:bg-cyan-50 disabled:opacity-50">
-                    ${activeOracleSearch.has(String(deal.id))?'◌ ORACLE sucht …':deal.market_deep_dive?.checked_at?'↻ Preise aktualisieren':'▶ Preise suchen'}
+                  <button type="button" data-oracle-search="${deal.id}" ${activeOracleSearch.has(String(deal.id))?'disabled':''} class="division-action disabled:opacity-50">
+                    ${activeOracleSearch.has(String(deal.id))?'Recherche läuft':'Recherche'}
                   </button>
                 </div>
 
@@ -2002,7 +2002,7 @@
 
               <!-- QUANTUM -->
 
-              <div data-division-section="quantum" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl"--accent:#d97706" class="division-workcard rounded-xl">
+              <div data-division-section="quantum" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
 
                 <div class="flex items-center gap-2 mb-3">
 
@@ -2083,13 +2083,13 @@
                   Rohvergleich vor Versand, Marketing und weiteren Kosten.
                 </p>
 
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>${quantityExcluded ? "X · Wirtschaftlichkeit gesperrt" : "Wirtschaftlichkeit im Detail ansehen ↗"}</button>
+              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
               </div>
 
 
               <!-- VERDICT -->
 
-              <div data-division-section="verdict" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl"--accent:#9333ea" class="division-workcard rounded-xl flex flex-col justify-between">
+              <div data-division-section="verdict" tabindex="-1" class="deal-division-section division-workcard division-unified rounded-xl">
 
                 <div>
 
@@ -2117,7 +2117,7 @@
 
                 </div>
 
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">${quantityExcluded ? "X · Nur Ablehnung / Dokumentation" : "Dein Urteil öffnen ↗"}</button>
+              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">Bewerten</button>
               </div>
 
               <!-- BREITE KI-KACHELN: zwei Spalten statt schmalem Dreier-Grid -->
@@ -2128,7 +2128,7 @@
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · Produkt</span>
                 </div>
-                <button type="button" class="ai-card-action division-action" data-ai-type="portrait" data-deal-id="${dealId}">Produktporträt erstellen</button>
+                <button type="button" class="ai-card-action division-action" data-ai-type="portrait" data-deal-id="${dealId}">Produkt Check</button>
                 <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Produktporträt noch nicht gestartet.</span>'}</p>
                 <div class="mt-4 border-t border-slate-200 pt-3 ai-followup" data-followup-kind="portrait" data-followup-deal="${dealId}">
                   <div class="text-[10px] text-slate-500 mb-2">Rückfragen an Albert · KI-Einschätzung, keine verifizierte Webrecherche.</div>
@@ -2146,7 +2146,7 @@
                   <span class="w-2 h-2 rounded-full bg-violet-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · Käufer</span>
                 </div>
-                <button type="button" class="ai-card-action division-action" data-ai-type="audience" data-deal-id="${dealId}">Zielgruppen analysieren</button>
+                <button type="button" class="ai-card-action division-action" data-ai-type="audience" data-deal-id="${dealId}">Zielgruppe</button>
                 <div id="target-audience-${dealId}" class="space-y-3 text-[12px] leading-relaxed text-slate-700">
                   <span class="text-slate-400">Zielgruppenanalyse noch nicht gestartet.</span>
                 </div>
