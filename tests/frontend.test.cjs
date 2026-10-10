@@ -25,7 +25,7 @@ test('all inline JavaScript parses', () => {
   for (const code of scripts) assert.doesNotThrow(() => new vm.Script(code));
 });
 test('discovery-first interface keeps four buyer decisions and defers analysis', () => {
-  assert.match(script, /let activeDealView = 'SOFORT'/);
+  assert.match(script, /let activeDealView = 'UNRATED'/);
   assert.match(script, /activeDealView !== 'DEEP_DIVE'/);
   for (const action of ['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT']) assert.ok(script.includes(action), 'missing ' + action);
   assert.match(script, /saved\.map\(item => item\.id\)/);
@@ -104,4 +104,14 @@ test('deal folders follow human verdict first, then research origin', () => {
   assert.equal(folder({id: 2, hunt_origin: 'SOFORT'}, new Map()), 'SOFORT');
   assert.equal(folder({id: 3, hunt_origin: 'SOFORT'}, new Map([['3', 'WATCH']])), 'WATCH');
   assert.equal(folder({id: 4, hunt_origin: 'PERMANENT'}, new Map([['4', 'DEEP_DIVE']])), 'DEEP_DIVE');
+});
+
+test('star folders filter by saved user rating without changing economic grade', () => {
+  for (const folder of ['UNRATED','STAR_1','STAR_2','STAR_3','STAR_4','STAR_5','ALL']) {
+    assert.match(html, new RegExp('data-view="'+folder+'"'));
+    assert.match(html, new RegExp('data-count="'+folder+'"'));
+  }
+  assert.match(script, /userStarRatings\.get\(String\(deal\.id\)\)/);
+  assert.match(script, /activeDealView==='UNRATED'/);
+  assert.match(script, /activeDealView==='STAR_'\+score/);
 });
