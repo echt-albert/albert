@@ -1305,6 +1305,27 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
+    let activeSpuersinnFilter = null;
+    document.getElementById('deals-container').addEventListener('click', event => {
+      const link = event.target.closest('[data-spuersinn-kind]');
+      if (link) {
+        activeSpuersinnFilter = { kind: link.dataset.spuersinnKind, value: link.dataset.spuersinnValue };
+        activeDealView = 'ALL';
+        activeCategoryFilter = null;
+        activeGradeFilter = null;
+        dealExpansion.clear();
+        fetchDeals();
+        return;
+      }
+      if (event.target.closest('[data-spuersinn-clear]')) {
+        activeSpuersinnFilter = null;
+        activeDealView = 'SOFORT';
+        activeCategoryFilter = null;
+        activeGradeFilter = null;
+        dealExpansion.clear();
+        fetchDeals();
+      }
+    });
     const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Abgelehnt' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
@@ -1313,6 +1334,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
       dealExpansion.clear();
       activeDealView = nextView;
+      activeSpuersinnFilter = null;
       activeCategoryFilter = null;
       activeGradeFilter = null;
       fetchDeals();
@@ -1935,7 +1957,12 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const folderDeals = activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => dealFolder(deal) === activeDealView);
+      const folderDeals = activeSpuersinnFilter ? (deals || []).filter(deal => {
+        if (activeSpuersinnFilter.kind === 'platform') {
+          try { return new URL(safeUrl(deal.offer_url)).hostname.toLowerCase().replace(/^www[.]/, '') === activeSpuersinnFilter.value; } catch { return false; }
+        }
+        return String(deal.supplier_name || '').trim().toLocaleLowerCase('de-DE') === activeSpuersinnFilter.value;
+      }) : activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => dealFolder(deal) === activeDealView);
       const categoryCounts = new Map();
       for (const deal of folderDeals) {
         const name = categoryName(deal);
@@ -1991,17 +2018,20 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         if (previousSupplier > 0) note = '🧠 Albert erinnert sich: Dieser Anbieter ist bereits bei '+previousSupplier+' weiteren Funden aufgetaucht.';
         else if (host && previousHost === 0) note = '🔎 Alberts Spürsinn: Neue Plattform im Fundbestand – '+host+'.';
         else if (host && previousHost > 0) note = '🔎 Alberts Spürsinn: '+previousHost+' weitere Funde von '+host+' sind bereits bekannt.';
-        if (note) discoveryNotes.set(String(candidate.id), note);
+        if (note) discoveryNotes.set(String(candidate.id), {
+          note, kind: previousSupplier > 0 ? 'supplier' : 'platform',
+          value: previousSupplier > 0 ? supplierKey : host
+        });
         if (host) sourceCounts.set(host, previousHost+1);
         if (supplierKey) supplierCounts.set(supplierKey, previousSupplier+1);
       }
       const spuersinnHtml = deal => {
-        const note = discoveryNotes.get(String(deal.id));
-        return note ? '<div class="mt-2 rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-slate-700">'+escapeHtml(note)+'</div>' : '';
+        const info = discoveryNotes.get(String(deal.id));
+        return info ? '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>' : '';
       };
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
-      const viewTitle = dealViewNames[activeDealView];
-      const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
+      const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
+      const viewHeading = '<div class="mb-4 flex items-center justify-between gap-3"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><div class="flex items-center gap-3"><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span>' + (activeSpuersinnFilter ? '<button type="button" data-spuersinn-clear class="rounded-lg border border-cyan-200 px-2.5 py-1 text-xs text-cyan-800 hover:bg-cyan-50">Filter entfernen ×</button>' : '') + '</div></div>';
 
       if (!visibleDeals.length) {
 
