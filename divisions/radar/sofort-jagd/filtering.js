@@ -1,14 +1,17 @@
 "use strict";
-/** Ergebnisse ohne gespeicherte ID nicht als bestätigten Neufund ausgeben. */
+/** Nur tatsächlich gespeicherte neue Deals zählen; andere Ergebnisse separat halten. */
 function classify(response) {
   const status = response?.status || "unknown";
   if (status === "new_saved") {
-    const deal = response.saved_deal;
-    if (deal && deal.id != null) return { status: "new", deal, count: 1 };
-    return { status: "unverified", deal: deal || null, count: 0 };
+    const deals = Array.isArray(response.saved_deals) ? response.saved_deals
+      : [response.saved_deal].filter(Boolean);
+    const persisted = deals.filter(deal => deal && deal.id != null);
+    return { status: persisted.length ? "new" : "unverified",
+      deal: persisted[0] || null, deals: persisted, count: persisted.length,
+      stats: response.stats || {} };
   }
   if (status === "duplicate_skipped") return { status: "duplicate", count: 0 };
   if (status === "alternative_offer_saved") return { status: "alternative", count: 0 };
-  return { status, count: 0 };
+  return { status, count: 0, stats: response?.stats || {} };
 }
 module.exports = { classify };
