@@ -2065,30 +2065,40 @@
         onProgress('RADAR recherchiert … ' + ((attempt + 1) * 3) + ' s');
       }
       if (!research) throw new Error('Recherche dauert zu lange; Job-ID: ' + jobId);
-      const product = research.saved_deal || research.deal;
-      if (!product) return { outcome: 'empty', count: 0 };
-      onProgress('RADAR abgeschlossen · CIPHER → ORACLE → QUANTUM …');
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'pipeline', researchProduct: product,
-          messages: [{ role: 'user', content: query }] })
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.error || 'Brain-Auswertung fehlgeschlagen.');
-      const analysis = data.pipeline?.results;
-      if (product.id && analysis) {
-        const { error: saveError } = await supabaseClient.from('discoveries')
-          .update({ brain_analysis: analysis, hunt_origin: 'SOFORT' }).eq('id', product.id);
-        if (saveError) throw new Error('Analyse konnte nicht gespeichert werden: ' + saveError.message);
+      const candidates = Array.isArray(research.saved_deals)
+        ? research.saved_deals : [research.saved_deal].filter(Boolean);
+      const saved = candidates.filter(item => item && item.id != null);
+      if (!saved.length) return { outcome: 'empty', count: 0, stats: research.stats || {} };
+      // RADAR already persisted all candidates. Expensive analysis is bounded to one.
+      const first = saved[0];
+      onProgress('RADAR: ' + saved.length + ' gespeichert · CIPHER → ORACLE → QUANTUM für ersten Kandidaten …');
+      let analysisWarning = null;
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'pipeline', researchProduct: first,
+            messages: [{ role: 'user', content: query }] })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Brain-Auswertung fehlgeschlagen.');
+        const analysis = data.pipeline?.results;
+        if (analysis) {
+          const { error: saveError } = await supabaseClient.from('discoveries')
+            .update({ brain_analysis: analysis }).eq('id', first.id);
+          if (saveError) throw new Error(saveError.message);
+        }
+      } catch (error) {
+        // Analysis failure must not hide successfully persisted sourcing candidates.
+        analysisWarning = error.message || 'Analyse noch offen';
       }
-      // Erfolg nur melden, wenn der neue Posten tatsächlich in der Sofort-Jagd gespeichert ist.
-      if (!product.id) return { outcome: 'unverified', count: 0 };
-      const { data: storedDeal, error: verifyError } = await supabaseClient.from('discoveries')
-        .select('id, hunt_origin').eq('id', product.id).maybeSingle();
-      if (verifyError) throw new Error('Recherche beendet, Speicherung konnte nicht überprüft werden: ' + verifyError.message);
-      if (!storedDeal || storedDeal.hunt_origin !== 'SOFORT') return { outcome: 'unverified', count: 0 };
-      return { outcome: 'saved', count: 1 };
+      const ids = saved.map(item => item.id);
+      const { data: stored, error: verifyError } = await supabaseClient.from('discoveries')
+        .select('id,hunt_origin').in('id', ids).eq('hunt_origin', 'SOFORT');
+      if (verifyError) throw new Error('Speicherung konnte nicht geprüft werden: ' + verifyError.message);
+      const count = stored?.length || 0;
+      if (!count) return { outcome: 'unverified', count: 0 };
+      return { outcome: 'saved', count, stats: research.stats || {}, analysisWarning };
     }
 
     window.triggerManualHunt = async function() {
@@ -2100,7 +2110,7 @@
           message => { showStatus(message, false); setAlbertActivity('hunt', 'Sofort-Jagd', message); }
         );
         if (data.outcome === 'saved') {
-          finishAlbertActivity('hunt', 'Sofort-Jagd', data.count + ' neuer Deal im Sofort-Jagd-Ordner.');
+          finishAlbertActivity('hunt', 'Sofort-Jagd', data.count + ' neue Kandidaten im Sofort-Jagd-Ordner.' + (data.analysisWarning ? ' Analyse noch offen: ' + data.analysisWarning : ''));
           activeDealView = 'SOFORT';
         } else if (data.outcome === 'empty') {
           finishAlbertActivity('hunt', 'Sofort-Jagd', 'Recherche abgeschlossen. Diesmal keine passenden Deals gefunden.', false, true);
