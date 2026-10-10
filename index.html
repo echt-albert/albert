@@ -379,6 +379,9 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 #deal-navigation .deal-view [data-count]{color:#64748b;font-variant-numeric:tabular-nums;font-weight:500}
 #deal-navigation .deal-view .text-amber-500{color:#64748b!important}
 #deal-navigation .deal-view .text-slate-300{color:#cbd5e1!important}
+
+/* Restore rating colors while keeping the professional, quiet navigation. */
+#deal-navigation .deal-view .text-amber-500{color:#f59e0b!important}
 </style>
 </head>
 
@@ -766,7 +769,7 @@ finally{button.disabled=false;button.textContent='🛰️ Neue Bezugsquellen suc
 function renderSourceRadar(){
 const out=document.getElementById('source-results');if(!out)return;
 const m=new Map();for(const d of radarDeals){const name=String(d.supplier_name||'').trim();if(!name||/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(name))continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:''});const x=m.get(key);x.count++;if(!x.url&&d.offer_url)x.url=typeof safeUrl==='function'?safeUrl(d.offer_url):''}
-for(const x of researchedSources){const name=String(x.name||'').trim();if(!name)continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:x.evidence_url||x.website||'',research:true,reason:x.reason||'',opportunity:x.opportunity||''});else{const row=m.get(key);row.research=true;row.reason=x.reason||'';row.opportunity=x.opportunity||'';if(!row.url)row.url=x.evidence_url||x.website||'';}}const rows=[...m.values()].sort((a,b)=>b.count-a.count);document.getElementById('source-count').textContent=rows.length;
+for(const x of researchedSources){const name=String(x.name||'').trim();if(!name)continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:x.evidence_url||x.website||'',research:true,reason:x.reason||'',opportunity:x.opportunity||''});else{const row=m.get(key);row.research=true;row.reason=x.reason||'';row.opportunity=x.opportunity||'';if(!row.url)row.url=x.evidence_url||x.website||'';}}const rows=[...m.values()].sort((a,b)=>b.count-a.count);const sourceCount=document.getElementById('source-count');if(sourceCount)sourceCount.textContent=rows.length;
 const q=(document.getElementById('source-search').value||'').toLocaleLowerCase('de');const state=radarState();const labels={call:'📞 Anrufen',mail:'✉️ Mailen',watch:'👁️ Beobachten',check:'📋 Angebot prüfen',reject:'✕ Verwerfen'};
 out.innerHTML=rows.filter(x=>x.name.toLocaleLowerCase('de').includes(q)).map(x=>'<article class="border rounded-xl p-4"><div class="flex justify-between gap-3"><div><strong class="text-sm">'+escapeHtml(x.name)+'</strong><p class="text-xs text-slate-500">'+x.count+' Deals'+(x.research?' · Neue Bezugsquelle':'')+' · '+(labels[state[x.key]?.action]||'Noch offen')+'</p></div>'+(x.url?'<a class="text-xs underline" href="'+escapeHtml(x.url)+'" target="_blank" rel="noopener noreferrer">Fundstelle ↗</a>':'')+'</div>'+(x.research?'<p class="text-xs mt-2 text-slate-600">'+escapeHtml(x.opportunity||'')+' · '+escapeHtml(x.reason||'')+'</p>':'')+'<div class="flex gap-2 flex-wrap mt-3">'+Object.entries(labels).map(([a,l])=>'<button type="button" data-radar-key="'+escapeHtml(x.key)+'" data-radar-action="'+a+'" class="border rounded-lg px-3 py-2 text-xs '+(state[x.key]?.action===a?'bg-slate-900 text-white':'hover:bg-slate-50')+'">'+l+'</button>').join('')+'</div></article>').join('')||'<p class="text-xs text-slate-500">Noch keine Quellen vorhanden.</p>';
 out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click',()=>radarSave(b.dataset.radarKey,b.dataset.radarAction)));
