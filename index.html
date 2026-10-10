@@ -506,6 +506,40 @@
     );
 
 
+    // Einkäufer-Login: Magic Link, keine Zugangsdaten im Browser-Code.
+    const buyerAuthBar = document.createElement('div');
+    buyerAuthBar.className = 'fixed bottom-3 right-3 z-50 rounded-xl border border-slate-200 bg-white p-3 shadow-lg text-xs max-w-xs';
+    buyerAuthBar.innerHTML = '<div class="font-semibold mb-1">Einkäufer-Konto</div><div data-buyer-auth-status class="text-slate-600 mb-2">Anmeldung wird geprüft …</div><div class="flex gap-1"><input data-buyer-email type="email" autocomplete="email" aria-label="E-Mail-Adresse für Einkäufer-Anmeldung" placeholder="E-Mail-Adresse" class="min-w-0 w-44 rounded border px-2 py-1"><button data-buyer-login type="button" class="rounded bg-slate-900 px-2 py-1 text-white">Login-Link</button><button data-buyer-logout type="button" class="hidden rounded border px-2 py-1">Abmelden</button></div>';
+    document.body.appendChild(buyerAuthBar);
+    const buyerAuthStatus = buyerAuthBar.querySelector('[data-buyer-auth-status]');
+    const buyerAuthEmail = buyerAuthBar.querySelector('[data-buyer-email]');
+    const buyerLoginButton = buyerAuthBar.querySelector('[data-buyer-login]');
+    const buyerLogoutButton = buyerAuthBar.querySelector('[data-buyer-logout]');
+    function renderBuyerAuth(session) {
+      const user = session?.user;
+      buyerAuthStatus.textContent = user ? 'Angemeldet: ' + (user.email || 'Einkäufer') : 'Nicht angemeldet · Annahmen nur lokal';
+      buyerAuthEmail.classList.toggle('hidden',!!user);
+      buyerLoginButton.classList.toggle('hidden',!!user);
+      buyerLogoutButton.classList.toggle('hidden',!user);
+    }
+    supabaseClient.auth.getSession().then(({data})=>renderBuyerAuth(data.session)).catch(()=>renderBuyerAuth(null));
+    supabaseClient.auth.onAuthStateChange((_event,session)=>renderBuyerAuth(session));
+    buyerLoginButton.addEventListener('click',async()=>{
+      const email=buyerAuthEmail.value.trim();
+      if(!buyerAuthEmail.checkValidity() || !email) { buyerAuthStatus.textContent='Bitte gültige E-Mail-Adresse eingeben.';return; }
+      buyerLoginButton.disabled=true;
+      buyerAuthStatus.textContent='Anmeldelink wird angefordert …';
+      try {
+        const {error}=await supabaseClient.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin+window.location.pathname,shouldCreateUser:false}});
+        buyerAuthStatus.textContent=error?'Anmeldung fehlgeschlagen: '+error.message:'Falls das Konto freigeschaltet ist, wurde ein Anmeldelink verschickt.';
+      } catch(_) {buyerAuthStatus.textContent='Anmeldung derzeit nicht erreichbar.';}
+      finally {buyerLoginButton.disabled=false;}
+    });
+    buyerLogoutButton.addEventListener('click',async()=>{
+      const {error}=await supabaseClient.auth.signOut();
+      if(error)buyerAuthStatus.textContent='Abmelden fehlgeschlagen: '+error.message;
+    });
+
     // =======================================================
     // STATUS
     // =======================================================
@@ -1618,6 +1652,21 @@
         ? 'Rest nach Marketing und Retouren nicht berechenbar: verifizierter B2C-Gesamtpreis fehlt.'
         : 'Rest nach 20 % Marketing und erwarteten Retourenkosten: ' + money(residual) + ' je Stück, vor EK, Versand, Gebühren und weiteren Kosten. Kein Gewinn/MAX-EK.';
       result.appendChild(detail);
+      const costFields=['shipping','fees','handling','other'];
+      const entered=costFields.map(field=>section.querySelector('[data-return-field="'+field+'"]')?.value ?? '');
+      const amounts=entered.map(Number);
+      if(lowest!==null && entered.every(value=>value!=='') && amounts.every(value=>Number.isFinite(value)&&value>=0)){
+        const operatingCosts=amounts.reduce((sum,value)=>sum+value,0)+perUnit;
+        const remaining=lowest*0.64-operatingCosts;
+        const line=document.createElement('p');
+        line.className='mt-2 font-semibold text-slate-800';
+        line.textContent='Rest nach Marketing, Retouren, Versand, Plattform, Handling und Sonstigem: '+money(remaining)+' / Stück (vor EK und Steuern).';
+        result.appendChild(line);
+        const warning=document.createElement('p');
+        warning.className='text-slate-500 mt-1';
+        warning.textContent='Bruttobasierter Vorvergleich, kein Gewinn und kein belastbarer MAX-EK: Steuerbasis, Vorsteuer, EK und ggf. zusätzliche Kosten noch offen.';
+        result.appendChild(warning);
+      }
       if (lowest !== null) {
         const title = document.createElement('p');
         title.className = 'mt-3 font-semibold text-slate-700';
@@ -2279,12 +2328,19 @@
 
               <details class="rounded-lg border border-slate-200 p-3 text-xs" data-return-scenario="${dealId}">
                 <summary class="cursor-pointer font-semibold text-slate-700">Retouren-Szenario · Einkäuferannahme</summary>
-                <p class="mt-2 text-slate-500">Noch keine KI-Prognose. Werte selbst eingeben; Speicherung vorläufig nur in diesem Browser, nicht in Alberts Entscheidungsgedächtnis.</p>
+                <p class="mt-2 text-slate-500">Keine KI-Prognose. Ohne Anmeldung lokal, mit Einkäufer-Login als eigene Revisionen in Supabase gespeichert.</p>
                 <div class="grid grid-cols-2 gap-2 mt-3">
                   <label>Retourenquote %<input type="number" min="0" max="100" step="0.5" inputmode="decimal" data-return-field="rate" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 8"></label>
                   <label>Kosten je Retoure €<input type="number" min="0" step="0.01" inputmode="decimal" data-return-field="cost" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 12"></label>
                 </div>
                 <p class="mt-2 text-[10px] text-slate-500" data-return-save-status>Browser-Speicherung aktiv · Server-Speicherung nur nach Anmeldung und Eingabeabschluss.</p>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                  <label>Endkundenversand / Stück €<input type="number" min="0" step="0.01" data-return-field="shipping" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
+                  <label>Plattformgebühren / Stück €<input type="number" min="0" step="0.01" data-return-field="fees" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
+                  <label>Handling / Stück €<input type="number" min="0" step="0.01" data-return-field="handling" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
+                  <label>Sonstige Kosten / Stück €<input type="number" min="0" step="0.01" data-return-field="other" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
+                </div>
+                <p class="mt-2 text-[10px] text-slate-500">Vollkosten erst mit bestätigter Netto-/Brutto-Basis, Steuern und Einkaufskosten möglich. Fehlende Felder sind nicht null.</p>
                 <div class="mt-2 text-slate-700" data-return-result>Beide Werte eingeben, um erwartete Retourenkosten zu berechnen.</div>
               </details>
               <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
