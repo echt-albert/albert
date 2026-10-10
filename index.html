@@ -303,6 +303,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         <button type="button" data-view="STAR_3" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span><span class="text-amber-500">★★★</span><span class="text-slate-300">☆☆</span></span><span data-count="STAR_3" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="STAR_2" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span><span class="text-amber-500">★★</span><span class="text-slate-300">☆☆☆</span></span><span data-count="STAR_2" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="STAR_1" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span><span class="text-amber-500">★</span><span class="text-slate-300">☆☆☆☆</span></span><span data-count="STAR_1" class="font-mono text-[11px]">–</span></button>
+        <button type="button" data-view="CLOSED" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>Beendete Deals</span><span data-count="CLOSED" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="ALL" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>Alle Deals</span><span data-count="ALL" class="font-mono text-[11px]">–</span></button>
       </nav>
       <details class="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500"><summary class="cursor-pointer py-2">Weitere Filter</summary><div class="mt-3"><div class="mb-2 font-semibold">Kategorien</div><div id="category-filters" class="flex flex-wrap gap-1.5"></div><div class="mb-2 mt-4 font-semibold">Bewertung</div><div id="grade-filters" class="flex flex-wrap gap-1.5"></div></div></details>
@@ -1370,7 +1371,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         fetchDeals();
       }
     });
-    const dealViewNames = { ALL: 'Alle Deals', UNRATED: '☆ Unbewertet', STAR_5: '★★★★★ · Meine Favoriten', STAR_4: '★★★★ · Sehr interessant', STAR_3: '★★★ · Vielleicht', STAR_2: '★★ · Eher nicht', STAR_1: '★ · Uninteressant' };
+    const dealViewNames = { ALL: 'Alle Deals', UNRATED: '☆ Unbewertet', STAR_5: '★★★★★ · Meine Favoriten', STAR_4: '★★★★ · Sehr interessant', STAR_3: '★★★ · Vielleicht', STAR_2: '★★ · Eher nicht', STAR_1: '★ · Uninteressant', CLOSED: 'Beendete Deals' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
@@ -1951,6 +1952,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let ratingUserId = null;
     // Bewertete Deals bleiben bis zum bewussten Abschluss sichtbar.
     const pendingRatingFinish = new Set();
+    let closedDealIds = new Set();
     let learningDealIndex = [];
     const ratingBusy = new Set();
     function learningTokens(deal) {
@@ -2001,16 +2003,19 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     async function loadStarRatings() {
       const {data:{user}}=await supabaseClient.auth.getUser();
       ratingUserId=user?.id||null;
-      if(!ratingUserId){userStarRatings=new Map();userRatingReasons=new Map();customRatingReasons=[];return;}
-      const [ratings,custom]=await Promise.all([
+      if(!ratingUserId){userStarRatings=new Map();userRatingReasons=new Map();customRatingReasons=[];closedDealIds=new Set();return;}
+      const [ratings,custom,closed]=await Promise.all([
         supabaseClient.from('deal_user_star_ratings').select('discovery_id,stars,reasons').eq('user_id',ratingUserId),
-        supabaseClient.from('buyer_rating_reasons').select('label').eq('user_id',ratingUserId).order('created_at')
+        supabaseClient.from('buyer_rating_reasons').select('label').eq('user_id',ratingUserId).order('created_at'),
+        supabaseClient.from('deal_closed_archive').select('discovery_id').eq('user_id',ratingUserId)
       ]);
       if(!ratings.error){
         userStarRatings=new Map((ratings.data||[]).map(r=>[String(r.discovery_id),r.stars]));
         userRatingReasons=new Map((ratings.data||[]).map(r=>[String(r.discovery_id),r.reasons||[]]));
       }
       if(!custom.error)customRatingReasons=(custom.data||[]).map(r=>r.label);
+      if(!closed.error)closedDealIds=new Set((closed.data||[]).map(r=>String(r.discovery_id)));
+      else showStatus('Beendete Deals konnten nicht geladen werden: '+closed.error.message,true);
     }
     async function saveBuyerRating(id) {
       if(ratingBusy.has(id))return false;
@@ -2125,9 +2130,9 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         const key = String(row.discovery_id);
         if (!latestAction.has(key) && ['WATCH','DEEP_DIVE','LEARN','REJECT'].includes(row.action)) latestAction.set(key, row.action);
       }
-      const counts = { ALL: (deals || []).length, UNRATED: 0, STAR_1: 0, STAR_2: 0, STAR_3: 0, STAR_4: 0, STAR_5: 0 };
+      const counts = { ALL: 0, CLOSED: 0, UNRATED: 0, STAR_1: 0, STAR_2: 0, STAR_3: 0, STAR_4: 0, STAR_5: 0 };
       const dealFolder = deal => latestAction.get(String(deal.id)) || (deal.hunt_origin === 'SOFORT' ? 'SOFORT' : 'INBOX');
-      for (const deal of deals || []) { const score=userStarRatings.get(String(deal.id)); counts[score ? 'STAR_'+score : 'UNRATED']++; }
+      for (const deal of deals || []) { if(closedDealIds.has(String(deal.id))){counts.CLOSED++;continue;} counts.ALL++; const score=userStarRatings.get(String(deal.id)); counts[score ? 'STAR_'+score : 'UNRATED']++; }
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
       document.querySelectorAll('.deal-view').forEach(button => {
         const selected = document.getElementById('source-panel')?.classList.contains('hidden') !== false && button.dataset.view === activeDealView;
@@ -2137,12 +2142,12 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const folderDeals = activeSpuersinnFilter ? (deals || []).filter(deal => {
+      const folderDeals = activeDealView === 'CLOSED' ? (deals || []).filter(deal => closedDealIds.has(String(deal.id))) : activeSpuersinnFilter ? (deals || []).filter(deal => !closedDealIds.has(String(deal.id))).filter(deal => {
         if (activeSpuersinnFilter.kind === 'platform') {
           try { return new URL(safeUrl(deal.offer_url)).hostname.toLowerCase().replace(/^www[.]/, '') === activeSpuersinnFilter.value; } catch { return false; }
         }
         return String(deal.supplier_name || '').trim().toLocaleLowerCase('de-DE') === activeSpuersinnFilter.value;
-      }) : activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => { const score=userStarRatings.get(String(deal.id)); return pendingRatingFinish.has(String(deal.id)) || (activeDealView==='UNRATED' ? !score : activeDealView==='STAR_'+score); });
+      }) : activeDealView === 'ALL' ? (deals || []).filter(deal => !closedDealIds.has(String(deal.id))) : (deals || []).filter(deal => !closedDealIds.has(String(deal.id))).filter(deal => { const score=userStarRatings.get(String(deal.id)); return pendingRatingFinish.has(String(deal.id)) || (activeDealView==='UNRATED' ? !score : activeDealView==='STAR_'+score); });
       const categoryCounts = new Map();
       for (const deal of folderDeals) {
         const name = categoryName(deal);
@@ -2267,6 +2272,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
             '</div><div data-insight-result="'+id+'" class="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-700"></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
             starWidget(id)+
+            '<div class="mt-3 flex justify-end"><button type="button" data-deal-close="'+id+'" data-deal-restore="'+(closedDealIds.has(String(deal.id))?'true':'false')+'" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-800">'+(closedDealIds.has(String(deal.id))?'↶ Deal reaktivieren':'○ Deal beenden')+'</button></div>'+
             '<div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'</div>'+
             '</article>';
         }
@@ -2815,6 +2821,19 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     }
 
 
+    async function setDealClosed(id,shouldClose) {
+      if(!ratingUserId){showStatus('Bitte zuerst beim Einkäufer-Konto anmelden.',true);return;}
+      const query=supabaseClient.from('deal_closed_archive');
+      const result=shouldClose
+        ? await query.upsert({discovery_id:Number(id),user_id:ratingUserId,closed_at:new Date().toISOString()},{onConflict:'discovery_id,user_id'})
+        : await query.delete().eq('discovery_id',Number(id)).eq('user_id',ratingUserId);
+      if(result.error){showStatus('Deal-Status konnte nicht gespeichert werden: '+result.error.message,true);return;}
+      if(shouldClose)closedDealIds.add(String(id));else closedDealIds.delete(String(id));
+      pendingRatingFinish.delete(String(id));
+      await fetchDeals(true);
+      showStatus(shouldClose?'Deal beendet und archiviert.':'Deal reaktiviert.');
+    }
+
     // =======================================================
     // DEAL-AKTIONEN
     // =======================================================
@@ -2822,6 +2841,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     document.getElementById('deals-container')
       .addEventListener('click', function(event) {
 
+        const closeButton = event.target.closest('[data-deal-close]');
+        if(closeButton){event.preventDefault();event.stopPropagation();setDealClosed(closeButton.dataset.dealClose,closeButton.dataset.dealRestore !== 'true');return;}
         const aiAction = event.target.closest('.ai-card-action');
         if (aiAction) {
           const id = String(aiAction.dataset.dealId);
