@@ -26,6 +26,7 @@ Deno.serve(async req=>{
  for(let i=0;i<body.rows.length;i++){
   const row=body.rows[i]||{},product=str(row.product_name),ean=str(row.ean_gtin,14),brand=str(row.brand,160),mpn=str(row.mpn,120);
   const qty=quantity(row.quantity),price=decimal(row.purchase_price),line=Number(row.line);
+  const testValues=row.test_values&&typeof row.test_values==="object"&&!Array.isArray(row.test_values)?row.test_values:null;
   if(!product||!validEan(ean)||(!Number.isInteger(line)||line<2)|| (str(row.quantity)&&qty===null)||(str(row.purchase_price)&&price===null)){
    errors.push({line:row.line,error:"Unvollständige oder ungültige Produktdaten"});continue;
   }
@@ -34,6 +35,14 @@ Deno.serve(async req=>{
   const {data,error}=await db.rpc("scanner_insert_deal",{p_source_key:sourceKey,p_filename:filename,p_line:line,p_user:user.id,p_product:product,p_brand:brand,p_ean:ean,p_mpn:mpn,p_quantity:qty,p_price:price,p_supplier:supplier});
   if(error){errors.push({line,error:"Speichern fehlgeschlagen"});continue;}
   if(data?.[0]?.created)created++;else skipped++;
+  // Testdaten separat halten: niemals als verifizierte Marktpreise speichern.
+  if(testValues&&Object.values(testValues).some(v=>String(v??"").trim())){
+   const dealId=data?.[0]?.deal_id??data?.[0]?.id??null;
+   if(!dealId){errors.push({line,error:"Deal gespeichert, aber ID für Testdaten fehlt (RPC-Rückgabe prüfen)"});continue;}
+   const safe=Object.fromEntries(Object.entries(testValues).slice(0,30).map(([k,v])=>[str(k,80),str(v,300)]));
+   const {error:extraError}=await db.from("scanner_test_values").upsert({discovery_id:dealId,values_json:safe},{onConflict:"discovery_id"});
+   if(extraError)errors.push({line,error:"Testdaten konnten nicht gespeichert werden"});
+  }
  }
  return respond({success:errors.length===0,created,skipped,errors:errors.slice(0,20),error:errors.length?errors.length+" Positionen konnten nicht übernommen werden":undefined},errors.length?207:200);
 });

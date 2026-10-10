@@ -815,9 +815,9 @@ function renderScannerPreview(data){
  importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importBtn,progress);box.append(importer);
  importBtn.addEventListener('click',async()=>{
   const find=(...names)=>data.headers.findIndex(h=>names.includes(h.toLowerCase().trim().replace(/\\s+/g,'_')));
-  const idx={name:find('produktname','artikelbezeichnung','bezeichnung','artikel','produkt','name'),brand:find('marke','brand'),ean:find('ean','ean_gtin','gtin'),mpn:find('mpn','artikelnummer','herstellerartikelnummer'),qty:find('menge','anzahl','verfuegbare_menge','stückzahl'),price:find('ek','ek_netto','preis_netto_eur','einkaufspreis'),basis:find('preisbasis','preiseinheit')};
+  const idx={name:find('produktname','artikelbezeichnung','bezeichnung','artikel','produkt','name'),brand:find('marke','brand'),ean:find('ean','ean_gtin','gtin'),mpn:find('mpn','artikelnummer','herstellerartikelnummer'),qty:find('menge','anzahl','verfuegbare_menge','stückzahl','postenmenge'),price:find('ek','ek_netto','preis_netto_eur','einkaufspreis','ek_pro_stueck_netto','ek_stueck_netto'),basis:find('preisbasis','preiseinheit'),total:find('posten_gesamt_netto','ek_gesamt_netto','posten_gesamt','gesamt_ek','einkaufswert_gesamt'),market:find('b2c_marktpreis_inkl_versand','marktpreis_inkl_versand','b2c_marktpreis','marktpreis_gesamtpreis'),sale:find('kalkulierter_vk','b2c_vk_inkl_versand','vk_inkl_versand','verkaufspreis'),shipping:find('versandkosten','versandkosten_pro_stueck'),marketing:find('marketingbudget','marketingbudget_gesamt'),demand:find('nachfrage','nachfragesignal'),competition:find('wettbewerb'),condition:find('zustand'),category:find('kategorie'),risk:find('risiko','risiken')};
   if(idx.name<0){progress.textContent='Keine Produktspalte erkannt. Bitte CSV-Spaltenüberschriften prüfen.';return;}
-  const rows=data.rows.map((r,i)=>({line:i+2,product_name:(r[idx.name]||'').trim(),brand:idx.brand<0?'':r[idx.brand],ean_gtin:idx.ean<0?'':r[idx.ean],mpn:idx.mpn<0?'':r[idx.mpn],quantity:idx.qty<0?'':r[idx.qty],purchase_price:idx.price<0?'':r[idx.price],price_basis:idx.basis<0?'':r[idx.basis]}));
+  const rows=data.rows.map((r,i)=>({line:i+2,product_name:(r[idx.name]||'').trim(),brand:idx.brand<0?'':r[idx.brand],ean_gtin:idx.ean<0?'':r[idx.ean],mpn:idx.mpn<0?'':r[idx.mpn],quantity:idx.qty<0?'':r[idx.qty],purchase_price:idx.price<0?'':r[idx.price],price_basis:idx.basis<0?'':r[idx.basis],test_values:{posten_gesamt:idx.total<0?'':r[idx.total],b2c_marktpreis:idx.market<0?'':r[idx.market],b2c_vk:idx.sale<0?'':r[idx.sale],versandkosten:idx.shipping<0?'':r[idx.shipping],marketingbudget:idx.marketing<0?'':r[idx.marketing],nachfrage:idx.demand<0?'':r[idx.demand],wettbewerb:idx.competition<0?'':r[idx.competition],zustand:idx.condition<0?'':r[idx.condition],kategorie:idx.category<0?'':r[idx.category],risiko:idx.risk<0?'':r[idx.risk]}}));
   if(rows.some(x=>!x.product_name)){progress.textContent='Mindestens eine Position ohne Produktnamen. Bitte Liste korrigieren.';return;}
   if(rows.length>1000){progress.textContent='Maximal 1.000 Positionen pro Import.';return;}
   if(!confirm(rows.length+' Artikel als unbewertete Deals übernehmen? Keine automatische Analyse.'))return;
@@ -2583,19 +2583,22 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         document.getElementById('deals-container');
 
       let deals, error, savedCategories, categoryError, feedbackRows, feedbackReadError;
+      let scannerTestValues=[];
       if (!useCached) await loadStarRatings();
       if (useCached && cachedDealSnapshot) {
-        ({deals, savedCategories, feedbackRows} = cachedDealSnapshot);
+        ({deals, savedCategories, feedbackRows, scannerTestValues} = cachedDealSnapshot);
       } else {
         const loaded = await Promise.all([
           supabaseClient.from('discoveries').select('*').order('discovered_at', {ascending:false}),
           supabaseClient.from('deal_category_labels').select('discovery_id,category'),
-          supabaseClient.from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id',{ascending:false})
+          supabaseClient.from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id',{ascending:false}),
+          supabaseClient.from('scanner_test_values').select('discovery_id,values_json')
         ]);
         ({data:deals,error} = loaded[0]);
         ({data:savedCategories,error:categoryError} = loaded[1]);
         ({data:feedbackRows,error:feedbackReadError} = loaded[2]);
-        if (!error && !feedbackReadError) cachedDealSnapshot = {deals,savedCategories,feedbackRows};
+        scannerTestValues=loaded[3].data||[];
+        if (!error && !feedbackReadError) cachedDealSnapshot = {deals,savedCategories,feedbackRows,scannerTestValues};
       }
 
       if (requestId!==dealRenderRequest || requestedView!==activeDealView)return;
@@ -2618,6 +2621,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
       // Veraltete asynchrone Antworten dürfen eine neu gewählte Rubrik nicht überschreiben.
       if(requestId!==dealRenderRequest || requestedView!==activeDealView)return;
+      const importedTestById=new Map((scannerTestValues||[]).map(v=>[String(v.discovery_id),v.values_json]));
+      for(const deal of deals||[])deal.scanner_test_values=importedTestById.get(String(deal.id))||null;
       radarDeals=deals||[];
       if(!useCached)renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
@@ -2927,10 +2932,11 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <div class="deal-fact"><span class="deal-fact-label">Posten</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' Stk.' : 'Menge unbekannt'}</strong></div>
               <div class="deal-fact"><span class="deal-fact-label">Inhalt</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' × ' : ''}${escapeHtml(deal.product_name || 'Artikel unbekannt')}</strong><small class="deal-fact-hint">Verpackungseinheiten nicht bestätigt</small></div>
               <div class="deal-fact"><span class="deal-fact-label">EK · ${escapeHtml(deal.currency||'EUR')}</span><strong class="deal-fact-value">${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2))+' '+(deal.currency==='EUR'||!deal.currency?'€':escapeHtml(deal.currency)) : 'Unbekannt'}</strong><small class="deal-fact-hint">Preisangabe aus Angebot · Bezugsbasis prüfen</small></div>
-              <div class="deal-fact"><span class="deal-fact-label">B2C-VK · je Stück inkl. Versand</span><strong class="deal-fact-value">${b2cLowest==null ? 'Noch unbekannt' : escapeHtml((b2cLowest*0.8).toFixed(2))+' €'}</strong><small class="deal-fact-hint">${b2cLowest==null ? 'Kein verifizierter Gesamtpreis' : '80 % des günstigsten verifizierten Gesamtpreises'}</small></div>
+              <div class="deal-fact"><span class="deal-fact-label">B2C-VK · je Stück inkl. Versand</span><strong class="deal-fact-value">${deal.scanner_test_values?.b2c_vk ? escapeHtml(String(deal.scanner_test_values.b2c_vk))+' €' : b2cLowest==null ? 'Noch unbekannt' : escapeHtml((b2cLowest*0.8).toFixed(2))+' €'}</strong><small class="deal-fact-hint">${deal.scanner_test_values?.b2c_vk ? 'SIMULIERTER TESTWERT · nicht verifiziert' : b2cLowest==null ? 'Kein verifizierter Gesamtpreis' : '80 % des günstigsten verifizierten Gesamtpreises'}</small></div>
               <div class="deal-fact"><span class="deal-fact-label">Anbieter</span><strong class="deal-fact-value">${escapeHtml(deal.supplier_name || 'Unbekannt')}</strong>${offerUrl ? '<a class="deal-fact-hint text-amber-800 underline" href="'+offerUrl+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>' : ''}</div>
             </div>
 
+             ${deal.scanner_test_values ? '<div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950"><strong>SIMULIERTE IMPORTDATEN – keine Marktverifizierung</strong><div class="mt-1">Posten gesamt: '+escapeHtml(String(deal.scanner_test_values.posten_gesamt||'—'))+' € · B2C-Marktpreis inkl. Versand: '+escapeHtml(String(deal.scanner_test_values.b2c_marktpreis||'—'))+' € · Versandkosten: '+escapeHtml(String(deal.scanner_test_values.versandkosten||'—'))+' € · Marketingbudget: '+escapeHtml(String(deal.scanner_test_values.marketingbudget||'—'))+' €</div><div class="mt-1">Nachfrage: '+escapeHtml(String(deal.scanner_test_values.nachfrage||'—'))+' · Wettbewerb: '+escapeHtml(String(deal.scanner_test_values.wettbewerb||'—'))+' · Zustand: '+escapeHtml(String(deal.scanner_test_values.zustand||'—'))+' · Kategorie: '+escapeHtml(String(deal.scanner_test_values.kategorie||'—'))+' · Risiko: '+escapeHtml(String(deal.scanner_test_values.risiko||'—'))+'</div></div>' : ''}
             <div class="buyer-risk-strip" aria-label="Risikostatus des Postens">
               <strong>Risiko-Check</strong>
               <span>Identität: ${deal.cipher_research?.checked_at ? 'Recherchehinweise · unbestätigt' : 'Offen'}</span>
