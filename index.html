@@ -81,6 +81,8 @@
     @keyframes albert-spin { to { transform: rotate(360deg); } }
     .albert-spinner { display:inline-block; width:13px; height:13px; border:2px solid #fcd34d; border-top-color:#92400e; border-radius:50%; animation:albert-spin .8s linear infinite; flex-shrink:0; }
     .albert-working { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:12px; color:#92400e; }
+    article[data-scanner-import="true"] { border:2px solid #f97316 !important; box-shadow:0 0 0 1px rgba(249,115,22,.15),0 3px 12px rgba(249,115,22,.08) !important; }
+    article[data-scanner-import="true"].deal-workspace { outline:2px solid #f97316; outline-offset:0; }
     .deal-compact > :not(.deal-header):not(.deal-division-nav):not(.deal-facts) { display:none !important; }
     .deal-compact .deal-header { margin-bottom:0 !important; }
     .deal-compact-summary { display:none; }
@@ -2628,7 +2630,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description,typeof deal.decision_reason==='string'&&deal.decision_reason.startsWith('RADAR-Hinweis (ungeprüft):')?deal.decision_reason.split(' · ')[0].replace('RADAR-Hinweis (ungeprüft): ',''):null].find(v=>typeof v==='string'&&v.trim());
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
-          return '<article id="deal-card-'+id+'" class="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow '+(deal.hunt_origin==='SOFORT'?'deal-sofort-highlight border-[#24a1d6]':'border-slate-200')+'">'+
+          return '<article id="deal-card-'+id+'" data-scanner-import="'+String(String(deal.offer_url||'').startsWith('scanner://import/'))+'" class="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow '+(deal.hunt_origin==='SOFORT'?'deal-sofort-highlight border-[#24a1d6]':'border-slate-200')+'">'+
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<div class="deal-header-spuersinn">'+spuersinnHtml(deal)+'</div></div>'+
@@ -2743,7 +2745,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
         return `
 
-          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#24a1d6] border-[#24a1d6] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" data-scanner-import="${String(deal.offer_url||'').startsWith('scanner://import/')}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#24a1d6] border-[#24a1d6] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <div class="mb-3 flex justify-end"><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
             <!-- DEAL HEADER -->
 
