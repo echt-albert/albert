@@ -1298,8 +1298,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span>';
         quickMarketInFlight.add(id);
         fetch(SUPABASE_URL+'/functions/v1/albert-quick-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({product:{product_name:deal.product_name,brand:deal.brand,ean_gtin:deal.ean_gtin,mpn:deal.mpn}}),signal:AbortSignal.timeout(28000)})
-          .then(r=>r.json()).then(data=>{quickMarketCache.set(id,data);renderQuickMarket(id,data);})
-          .catch(()=>{const data={success:false};quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||'Suchdienst nicht verfügbar');return data;}).then(data=>{if(data?.success&&(data.low_eur||data.cheapest_price_eur))quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .catch(error=>{const el=document.querySelector('[data-quick-market="'+id+'"]');if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-amber-700">Suche fehlgeschlagen · bitte erneut versuchen</span>';console.warn('Preisindikation',id,error);})
           .finally(()=>quickMarketInFlight.delete(id));
       }
     }
