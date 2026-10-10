@@ -393,7 +393,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
         <div class="min-w-0">
 
-          <section id="source-panel" class="hidden mb-6 bg-white border rounded-2xl p-6"><div class="flex justify-between"><div><h2 class="font-semibold text-xl">🛰️ Quellenradar</h2><p class="text-xs text-slate-500 mt-2">Lieferanten aus Alberts bisherigen Recherchen. Du entscheidest.</p></div><button onclick="toggleSourceRadar(false)" class="text-xs">Schließen ×</button></div><p class="text-xs bg-amber-50 p-3 rounded-lg mt-4">Pilotversion: Anbieter werden aus bestehenden Deals übernommen. Neue Lieferanten im Web suchen und automatisches Beobachten sind noch nicht angeschlossen. Entscheidungen werden nur in diesem Browser gespeichert.</p><input id="source-search" oninput="renderSourceRadar()" placeholder="Quelle suchen …" class="w-full border rounded-lg p-3 text-xs mt-4"><div id="source-results" class="space-y-3 mt-4"></div></section>
+          <section id="source-panel" class="hidden mb-6 bg-white border rounded-2xl p-6"><div class="flex justify-between"><div><h2 class="font-semibold text-xl">🛰️ Quellenradar</h2><p class="text-xs text-slate-500 mt-2">Lieferanten aus Alberts bisherigen Recherchen. Du entscheidest.</p></div><button onclick="toggleSourceRadar(false)" class="text-xs">Schließen ×</button></div><p class="text-xs bg-amber-50 p-3 rounded-lg mt-4">Quellen aus bisherigen Deals und eigenständiger Web-Recherche. Entscheidungen werden derzeit nur in diesem Browser gespeichert; neue Quellen müssen vor Kontaktaufnahme verifiziert werden.</p><div class="flex gap-3 items-center mt-4"><button type="button" id="source-research-button" onclick="startSourceResearch()" class="bg-slate-900 text-white px-4 py-3 rounded-xl text-xs font-semibold">🛰️ Neue Bezugsquellen suchen</button><span id="source-research-status" role="status" class="text-xs text-slate-600"></span></div><input id="source-search" oninput="renderSourceRadar()" placeholder="Quelle suchen …" class="w-full border rounded-lg p-3 text-xs mt-4"><div id="source-results" class="space-y-3 mt-4"></div></section>
           <div id="deals-container" class="space-y-6">
 
             <div class="text-center py-24 text-slate-400 text-sm mono">
@@ -502,16 +502,34 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <script>
 
 
-let radarDeals=[];
+let radarDeals=[];let researchedSources=[];
 function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
 function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
-function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);if(show)renderSourceRadar()}
+function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);if(show){renderSourceRadar();loadResearchedSources()}}
+async function loadResearchedSources(){
+const {data,error}=await supabaseClient.from('sourcing_sources').select('*').order('discovered_at',{ascending:false}).limit(100);
+if(!error){researchedSources=data||[];renderSourceRadar();}
+}
+async function startSourceResearch(){
+const button=document.getElementById('source-research-button'),status=document.getElementById('source-research-status');
+const {data:{session}}=await supabaseClient.auth.getSession();
+if(!session){status.textContent='Bitte zuerst beim Einkäufer-Konto anmelden.';return;}
+button.disabled=true;button.textContent='Recherche läuft …';status.textContent='Albert sucht neue Lieferanten. Das kann etwas dauern.';
+try{
+const response=await fetch(SUPABASE_URL+'/functions/v1/albert-source-research',{method:'POST',headers:{'content-type':'application/json','apikey':SUPABASE_ANON_KEY,'authorization':'Bearer '+session.access_token},body:'{}'});
+const result=await response.json();
+if(!response.ok||!result.success)throw Error(result.error||'Recherche fehlgeschlagen');
+status.textContent=(result.saved||0)+' neue Bezugsquellen gespeichert.';
+await loadResearchedSources();
+}catch(e){status.textContent='Recherchefehler: '+e.message;}
+finally{button.disabled=false;button.textContent='🛰️ Neue Bezugsquellen suchen';}
+}
 function renderSourceRadar(){
 const out=document.getElementById('source-results');if(!out)return;
 const m=new Map();for(const d of radarDeals){const name=String(d.supplier_name||'').trim();if(!name||/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(name))continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:''});const x=m.get(key);x.count++;if(!x.url&&d.offer_url)x.url=typeof safeUrl==='function'?safeUrl(d.offer_url):''}
-const rows=[...m.values()].sort((a,b)=>b.count-a.count);document.getElementById('source-count').textContent=rows.length;
+for(const x of researchedSources){const name=String(x.name||'').trim();if(!name)continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:x.evidence_url||x.website||'',research:true,reason:x.reason||'',opportunity:x.opportunity||''});else{const row=m.get(key);row.research=true;row.reason=x.reason||'';row.opportunity=x.opportunity||'';if(!row.url)row.url=x.evidence_url||x.website||'';}}const rows=[...m.values()].sort((a,b)=>b.count-a.count);document.getElementById('source-count').textContent=rows.length;
 const q=(document.getElementById('source-search').value||'').toLocaleLowerCase('de');const state=radarState();const labels={call:'📞 Anrufen',mail:'✉️ Mailen',watch:'👁️ Beobachten',check:'📋 Angebot prüfen',reject:'✕ Verwerfen'};
-out.innerHTML=rows.filter(x=>x.name.toLocaleLowerCase('de').includes(q)).map(x=>'<article class="border rounded-xl p-4"><div class="flex justify-between gap-3"><div><strong class="text-sm">'+escapeHtml(x.name)+'</strong><p class="text-xs text-slate-500">'+x.count+' Deals · '+(labels[state[x.key]?.action]||'Noch offen')+'</p></div>'+(x.url?'<a class="text-xs underline" href="'+escapeHtml(x.url)+'" target="_blank" rel="noopener noreferrer">Fundstelle ↗</a>':'')+'</div><div class="flex gap-2 flex-wrap mt-3">'+Object.entries(labels).map(([a,l])=>'<button type="button" data-radar-key="'+escapeHtml(x.key)+'" data-radar-action="'+a+'" class="border rounded-lg px-3 py-2 text-xs '+(state[x.key]?.action===a?'bg-slate-900 text-white':'hover:bg-slate-50')+'">'+l+'</button>').join('')+'</div></article>').join('')||'<p class="text-xs text-slate-500">Noch keine Quellen vorhanden.</p>';
+out.innerHTML=rows.filter(x=>x.name.toLocaleLowerCase('de').includes(q)).map(x=>'<article class="border rounded-xl p-4"><div class="flex justify-between gap-3"><div><strong class="text-sm">'+escapeHtml(x.name)+'</strong><p class="text-xs text-slate-500">'+x.count+' Deals'+(x.research?' · Neue Bezugsquelle':'')+' · '+(labels[state[x.key]?.action]||'Noch offen')+'</p></div>'+(x.url?'<a class="text-xs underline" href="'+escapeHtml(x.url)+'" target="_blank" rel="noopener noreferrer">Fundstelle ↗</a>':'')+'</div>'+(x.research?'<p class="text-xs mt-2 text-slate-600">'+escapeHtml(x.opportunity||'')+' · '+escapeHtml(x.reason||'')+'</p>':'')+'<div class="flex gap-2 flex-wrap mt-3">'+Object.entries(labels).map(([a,l])=>'<button type="button" data-radar-key="'+escapeHtml(x.key)+'" data-radar-action="'+a+'" class="border rounded-lg px-3 py-2 text-xs '+(state[x.key]?.action===a?'bg-slate-900 text-white':'hover:bg-slate-50')+'">'+l+'</button>').join('')+'</div></article>').join('')||'<p class="text-xs text-slate-500">Noch keine Quellen vorhanden.</p>';
 out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click',()=>radarSave(b.dataset.radarKey,b.dataset.radarAction)));
 }
 
