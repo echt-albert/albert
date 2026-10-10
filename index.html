@@ -1191,6 +1191,8 @@
       button.addEventListener('click', retry, { once: true });
       target.append(note, button);
     }
+    const portraitRegenerate = new Set();
+    const audienceRegenerate = new Set();
     const portraitRequests = new Map();
     const portraitCache = new Map();
     async function loadProductPortrait(id) {
@@ -1200,10 +1202,11 @@
       if (portraitCache.has(key)) { target.textContent = portraitCache.get(key); return; }
       if (portraitRequests.has(key)) return;
       portraitRequests.set(key, true);
+      updateAiButtons(key);
       target.textContent = 'Albert recherchiert die wichtigsten Merkmale dieses Modells …';
       try {
         const { data, error } = await supabaseClient.functions.invoke('albert-product-portrait', {
-          body: { deal_id: key }
+          body: { deal_id: key, force: portraitRegenerate.has(key) }
         });
         if (error) throw error;
         const current = document.getElementById('product-portrait-' + key);
@@ -1222,6 +1225,7 @@
         showAiRetry(current, aiFailureMessage(error, 'Produktporträt'), () => loadProductPortrait(key));
       } finally {
         portraitRequests.delete(key);
+        updateAiButtons(key);
       }
     }
     const audienceRequests = new Map();
@@ -1236,9 +1240,10 @@
       }
       if (audienceRequests.has(key)) return;
       audienceRequests.set(key, true);
+      updateAiButtons(key);
       target.textContent = 'Albert ermittelt mögliche Käufergruppen …';
       try {
-        const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key}});
+        const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key,force: audienceRegenerate.has(key)}});
         if(error) throw error;
         if(data?.status === 'pending') {
           showAiRetry(document.getElementById('target-audience-'+key), 'Zielgruppenanalyse wird noch verarbeitet.', () => loadTargetAudience(key));
@@ -1280,7 +1285,26 @@
         showAiRetry(node, aiFailureMessage(e, 'Zielgruppenanalyse'), () => loadTargetAudience(key));
       } finally {
         audienceRequests.delete(key);
+        updateAiButtons(key);
       }
+    }
+    function restoreAiCards(id) {
+      const key = String(id);
+      const p = document.getElementById('product-portrait-' + key);
+      const a = document.getElementById('target-audience-' + key);
+      if (p && portraitCache.has(key)) p.textContent = portraitCache.get(key);
+      if (a && audienceCache.has(key)) a.replaceChildren(...audienceCache.get(key).map(n => n.cloneNode(true)));
+      updateAiButtons(key);
+    }
+    function updateAiButtons(id) {
+      const card = document.getElementById('deal-card-' + id);
+      if (!card) return;
+      card.querySelectorAll('.ai-card-action').forEach(button => {
+        const portrait = button.dataset.aiType === 'portrait';
+        button.textContent = (portrait ? portraitCache : audienceCache).has(id) ? 'Neu erstellen ↻' :
+          portrait ? 'Produktporträt erstellen' : 'Zielgruppen analysieren';
+        button.disabled = (portrait ? portraitRequests : audienceRequests).has(id);
+      });
     }
     function toggleDealCard(id) {
       const key = String(id);
@@ -1289,7 +1313,7 @@
       const open = card.classList.contains('deal-compact');
       dealExpansion.set(key, open);
       card.classList.toggle('deal-compact', !open);
-      if (open) { loadProductPortrait(key); loadTargetAudience(key); }
+      if (open) restoreAiCards(key);
       const button = card.querySelector('.deal-expand');
       if (button) {
         button.textContent = open ? 'Einklappen ↑' : 'Aufklappen ↓';
@@ -1872,7 +1896,8 @@
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKTPORTRÄT</span>
                 </div>
-                <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Beim Aufklappen recherchiert Albert ein individuelles Produktporträt.</span>'}</p>
+                <button type="button" class="ai-card-action mb-3 self-start rounded-lg border px-3 py-2 text-[11px] font-semibold text-emerald-800" data-ai-type="portrait" data-deal-id="${dealId}">Produktporträt erstellen</button>
+                <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Produktporträt noch nicht gestartet.</span>'}</p>
               </div>
 
               <!-- ZIELGRUPPEN -->
@@ -1881,8 +1906,9 @@
                   <span class="w-2 h-2 rounded-full bg-violet-500"></span>
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · ZIELGRUPPEN</span>
                 </div>
+                <button type="button" class="ai-card-action mb-3 self-start rounded-lg border px-3 py-2 text-[11px] font-semibold text-violet-800" data-ai-type="audience" data-deal-id="${dealId}">Zielgruppen analysieren</button>
                 <div id="target-audience-${dealId}" class="space-y-3 text-[12px] leading-relaxed text-slate-700">
-                  <span class="text-slate-400">Beim Aufklappen ermittelt Albert mögliche Zielgruppen und Kaufmotive.</span>
+                  <span class="text-slate-400">Zielgruppenanalyse noch nicht gestartet.</span>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-3">KI-basierte Hypothesen · keine nachgewiesenen Käuferdaten</p>
               </div>
@@ -2006,8 +2032,7 @@
       // Offene Deal-Kacheln nach jedem Re-Render wiederherstellen.
       for (const deal of visibleDeals) {
         if (isDealExpanded(deal.id, activeDealView)) {
-          loadProductPortrait(deal.id);
-          loadTargetAudience(deal.id);
+          restoreAiCards(deal.id);
         }
       }
 
@@ -2021,6 +2046,20 @@
     document.getElementById('deals-container')
       .addEventListener('click', function(event) {
 
+        const aiAction = event.target.closest('.ai-card-action');
+        if (aiAction) {
+          const id = String(aiAction.dataset.dealId);
+          if (aiAction.dataset.aiType === 'portrait') {
+            if (portraitCache.has(id)) portraitRegenerate.add(id);
+            portraitCache.delete(id);
+            loadProductPortrait(id);
+          } else {
+            if (audienceCache.has(id)) audienceRegenerate.add(id);
+            audienceCache.delete(id);
+            loadTargetAudience(id);
+          }
+          return;
+        }
         const guidance = event.target.closest('.deal-guidance-action');
         if (guidance) { openVerdictChoices(guidance.dataset.dealId); return; }
         const button = event.target.closest('.deal-action');
