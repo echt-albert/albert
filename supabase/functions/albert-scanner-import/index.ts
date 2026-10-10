@@ -40,6 +40,7 @@ Deno.serve(async req=>{
   const candidate=str(row.offer_url||testValues?.quelle||testValues?.quellenlink,2000);
   let verifiedUrl="";
   try{const u=new URL(candidate);if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)verifiedUrl=u.toString();}catch{/* Missing or invalid URL stays empty */}
+  if(dealId){const {error:originError}=await db.from("discoveries").update({hunt_origin:"SCANNER"}).eq("id",dealId);if(originError)errors.push({line,error:"Scanner-Herkunft konnte nicht gespeichert werden"});}
   if(dealId&&verifiedUrl){const {error:linkError}=await db.from("discoveries").update({offer_url:verifiedUrl}).eq("id",dealId);if(linkError)errors.push({line,error:"Quelllink konnte nicht gespeichert werden"});}
   // Testdaten separat halten: niemals als verifizierte Marktpreise speichern.
   if(testValues&&Object.values(testValues).some(v=>String(v??"").trim())){
