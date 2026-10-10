@@ -88,8 +88,32 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       const existing = await db.from("discoveries").select("id").eq("offer_url", offerUrl).limit(1);
       if (existing.error) throw existing.error;
       if (existing.data?.length) { stats.duplicates++; continue; }
-      // Do not equate the same product with a duplicate source: distinct sellers matter.
-      // Keep identity deduplication as a later, evidence-based step.
+      // Same identifiable product, different supplier: store as alternative, not a new deal.
+      const ean = text(candidate.ean_gtin);
+      const mpn = text(candidate.mpn);
+      let identityQuery: any = null;
+      if (ean) identityQuery = db.from("discoveries").select("id").eq("ean_gtin", ean).limit(1);
+      else if (mpn && text(candidate.brand))
+        identityQuery = db.from("discoveries").select("id").ilike("brand", text(candidate.brand)).ilike("mpn", mpn).limit(1);
+      if (identityQuery) {
+        const match = await identityQuery;
+        if (match.error) throw match.error;
+        if (match.data?.length) {
+          const alternative = await db.from("discovered_alternative_offers").insert({
+            discovery_id: match.data[0].id, offer_url: offerUrl, product_name: productName,
+            purchase_price: typeof candidate.purchase_price === "number" ? candidate.purchase_price : null,
+            currency: text(candidate.currency) || "EUR",
+            quantity: typeof candidate.quantity === "number" ? candidate.quantity : null,
+            detected_by: "RADAR"
+          });
+          if (alternative.error) {
+            if (alternative.error.code === "23505") { stats.duplicates++; continue; }
+            stats.errors++; continue;
+          }
+          stats.alternative++;
+          continue;
+        }
+      }
       const purchase = typeof candidate.purchase_price === "number" && candidate.purchase_price >= 0
         ? candidate.purchase_price : null;
       const quantity = typeof candidate.quantity === "number" && candidate.quantity > 0
@@ -102,7 +126,7 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
         market_prices: [], decision_grade: "B",
         decision_reason: "RADAR-Kandidat: Identität, EK, DE-Markt, Nachfrage und Vollkosten noch nicht verifiziert." +
           (urlState === "unverified" ? " URL technisch nicht verifizierbar." : ""),
-        bucket: "DIVE", research_run_id: runId, hunt_origin: origin,
+        bucket: "WATCH", research_run_id: runId, hunt_origin: origin,
         discovered_at: new Date().toISOString()
       };
       const inserted = await db.from("discoveries").insert(row).select().single();
