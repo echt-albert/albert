@@ -306,6 +306,9 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         <button type="button" data-view="LEARN" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
           <span>🧠 Erfahrung festhalten</span><span data-count="LEARN" class="font-mono text-[11px]">–</span>
         </button>
+        <button type="button" data-view="REJECT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
+          <span>✕ Abgelehnt</span><span data-count="REJECT" class="font-mono text-[11px]">–</span>
+        </button>
       </nav>
       <details class="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500"><summary class="cursor-pointer py-2">Weitere Filter</summary><div class="mt-3"><div class="mb-2 font-semibold">Kategorien</div><div id="category-filters" class="flex flex-wrap gap-1.5"></div><div class="mb-2 mt-4 font-semibold">Bewertung</div><div id="grade-filters" class="flex flex-wrap gap-1.5"></div></div></details>
       <button type="button" class="albert-account-toggle" onclick="document.body.classList.toggle('albert-account-open')">Einkäufer-Konto anzeigen</button>
@@ -1302,7 +1305,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
-    const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
+    const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Abgelehnt' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
