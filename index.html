@@ -249,7 +249,8 @@
       </div>
 
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Deal-Ablage">
-        <button type="button" data-view="INBOX" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+        <button type="button" data-view="ALL" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200"><span>▤ Alle Deals</span><span data-count="ALL" class="font-mono text-[11px]">–</span></button>
+        <button type="button" data-view="INBOX" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
           <span>📥 Intelligence Feed</span><span data-count="INBOX" class="font-mono text-[11px]">–</span>
         </button>
         <button type="button" data-view="SOFORT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>⚡ Sofort-Jagd</span><span data-count="SOFORT" class="font-mono text-[11px]">–</span></button>
@@ -1155,10 +1156,10 @@
     // =======================================================
 
     // Ein Deal hat genau eine Ablage: die jeweils letzte menschliche Entscheidung.
-    let activeDealView = 'INBOX';
+    let activeDealView = 'ALL';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
-    const dealViewNames = { INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
+    const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
@@ -1560,7 +1561,7 @@
         const key = String(row.discovery_id);
         if (!latestAction.has(key) && ['WATCH','DEEP_DIVE','LEARN','REJECT'].includes(row.action)) latestAction.set(key, row.action);
       }
-      const counts = { INBOX: 0, SOFORT: 0, WATCH: 0, DEEP_DIVE: 0, LEARN: 0, REJECT: 0 };
+      const counts = { ALL: (deals || []).length, INBOX: 0, SOFORT: 0, WATCH: 0, DEEP_DIVE: 0, LEARN: 0, REJECT: 0 };
       const dealFolder = deal => latestAction.get(String(deal.id)) || (deal.hunt_origin === 'SOFORT' ? 'SOFORT' : 'INBOX');
       for (const deal of deals || []) counts[dealFolder(deal)]++;
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
@@ -1572,7 +1573,7 @@
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const folderDeals = (deals || []).filter(deal => dealFolder(deal) === activeDealView);
+      const folderDeals = activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => dealFolder(deal) === activeDealView);
       const categoryCounts = new Map();
       for (const deal of folderDeals) {
         const name = categoryName(deal);
