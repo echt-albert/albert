@@ -1929,6 +1929,13 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           const source=safeUrl(deal.offer_url);
           const price=Number(deal.purchase_price);
           const priceKnown=Number.isFinite(price)&&price>0;
+          const reasonRaw=String(deal.decision_reason||'');
+          const auction=/auktion|versteigerung|startgebot|aufrufpreis|starting bid|Preisart:\s*auction_start/i.test(reasonRaw);
+          const priceType=(reasonRaw.match(/Preisart:\s*(fixed|auction_start|negotiable|unknown)/i)||[])[1]||'unknown';
+          const priceScope=(reasonRaw.match(/Preiseinheit:\s*(unit|lot|unknown)/i)||[])[1]||'unknown';
+          const unit=(reasonRaw.match(/Mengeneinheit:\s*([^·]+)/i)||[])[1]?.trim();
+          const priceTitle=auction?'Startgebot (kein EK)':priceType==='fixed'?'Festpreis laut Angebot':priceType==='negotiable'?'Verhandlungsbasis':'Preis laut Angebot (ungeprüft)';
+          const priceSuffix=priceScope==='lot'?' · Gesamtposten':priceScope==='unit'?' · je Einheit':'';
           const qty=Number(deal.quantity);
           const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
           const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
@@ -1941,8 +1948,8 @@ body.albert-account-open .albert-auth-panel{display:block!important}
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p></div>'+
             '<span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">Fund · ungeprüft</span></div>'+
             '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
-            '<div><span class="block text-[10px] text-slate-500">EK laut Angebot</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
-            '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' Stück'):'Unbekannt')+'</strong></div>'+
+            '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
+            '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
             '<div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'</div>'+
