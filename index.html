@@ -2027,7 +2027,11 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       }
       const spuersinnHtml = deal => {
         const info = discoveryNotes.get(String(deal.id));
-        return info ? '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>' : '';
+        if (!info) return '';
+        const filtered = activeSpuersinnFilter && activeSpuersinnFilter.kind === info.kind && activeSpuersinnFilter.value === info.value;
+        return filtered
+          ? '<button type="button" data-spuersinn-clear class="mt-2 block w-full rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:bg-cyan-100/70" title="Spürsinn-Filter entfernen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Filter entfernen ×</span></button>'
+          : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
       };
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
       const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
