@@ -25,15 +25,15 @@ Deno.serve(async req=>{
  let created=0,skipped=0;const errors=[];
  for(let i=0;i<body.rows.length;i++){
   const row=body.rows[i]||{},product=str(row.product_name),ean=str(row.ean_gtin,14),brand=str(row.brand,160),mpn=str(row.mpn,120);
-  const qty=quantity(row.quantity),price=decimal(row.purchase_price),line=Number(row.line);
+  const qty=quantity(row.quantity),rawPrice=decimal(row.purchase_price),line=Number(row.line);\n  const basis=str(row.price_basis,60).toLowerCase();\n  const price=rawPrice!==null&&(!basis||/^(stück|stueck|stk|einzelpreis|pro stück|pro stk|je stück|1 stück|piece|unit)$/.test(basis))?rawPrice:null;
   if(!product||!validEan(ean)||(!Number.isInteger(line)||line<2)|| (str(row.quantity)&&qty===null)||(str(row.purchase_price)&&price===null)){
    errors.push({line:row.line,error:"Unvollständige oder ungültige Produktdaten"});continue;
   }
   // Dedup within the same uploaded source and position; identical later uploads reuse the deal.
-  const sourceKey=await sha([filename,line,product,ean,mpn,qty,price].join("|"));
+  const sourceKey=await sha([filename,line,product,ean,mpn,qty,rawPrice,basis].join("|"));
   const {data,error}=await db.rpc("scanner_insert_deal",{p_source_key:sourceKey,p_filename:filename,p_line:line,p_user:user.id,p_product:product,p_brand:brand,p_ean:ean,p_mpn:mpn,p_quantity:qty,p_price:price,p_supplier:supplier});
   if(error){errors.push({line,error:"Speichern fehlgeschlagen"});continue;}
   if(data?.[0]?.created)created++;else skipped++;
  }
- return respond({success:errors.length===0,created,skipped,errors:errors.slice(0,20),error:errors.length?errors.length+" Positionen konnten nicht übernommen werden":undefined},errors.length?207:200);
+ return respond({success:errors.length===0,created,skipped,errors:errors.slice(0,20),error:errors.length?errors.length+" Positionen konnten nicht übernommen werden":undefined});
 });
