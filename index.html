@@ -328,6 +328,26 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-header-spuersinn [data-spuersinn-kind],
     .deal-header-spuersinn [data-spuersinn-clear]{margin-top:0;width:auto;max-width:100%;text-align:left}
     @media(max-width:700px){.deal-header-spuersinn{max-width:100%;width:100%}.deal-header-spuersinn [data-spuersinn-kind],.deal-header-spuersinn [data-spuersinn-clear]{width:100%}}
+
+    .deal-inline-actions{gap:3px;flex-wrap:nowrap;align-items:center}
+    .deal-inline-actions button,.deal-inline-actions summary{font-family:inherit}
+    .deal-inline-actions svg{width:15px;height:15px;flex:none}
+    .deal-inline-actions .deal-toolbar-primary,.deal-inline-actions .deal-toolbar-secondary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 11px;border:0;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;transition:background .15s,color .15s}
+    .deal-inline-actions .deal-toolbar-primary{background:#eaf7fd;color:#1685b4}
+    .deal-inline-actions .deal-toolbar-primary:hover{background:#d8effb}
+    .deal-inline-actions .deal-toolbar-secondary{background:transparent;color:#475569}
+    .deal-inline-actions .deal-toolbar-secondary:hover{background:#f1f5f9;color:#0f172a}
+    .deal-inline-actions .deal-toolbar-reject:hover{background:#fff1f2;color:#be123c}
+    .deal-toolbar-divider{width:1px;height:22px;background:#e2e8f0;margin:0 4px}
+    .deal-toolbar-menu{position:relative;flex:none}
+    .deal-toolbar-menu>summary{list-style:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;color:#64748b;cursor:pointer}
+    .deal-toolbar-menu>summary::-webkit-details-marker{display:none}
+    .deal-toolbar-menu>summary:hover,.deal-toolbar-menu[open]>summary{background:#f1f5f9;color:#0f172a}
+    .deal-toolbar-dropdown{position:absolute;right:0;top:calc(100% + 5px);z-index:30;min-width:170px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.13);padding:5px}
+    .deal-toolbar-dropdown button{width:100%;text-align:left;padding:10px 12px;border-radius:7px;color:#475569;font-size:12px}
+    .deal-toolbar-dropdown button:hover{background:#f8fafc;color:#0f172a}
+    .deal-inline-actions :is(button,summary):focus-visible{outline:2px solid #24a1d6;outline-offset:2px}
+    @media(max-width:700px){.deal-inline-actions{flex-wrap:wrap;justify-content:flex-end}.deal-rating-with-akte{flex-wrap:wrap}}
 </style>
 </head>
 
@@ -2395,7 +2415,12 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
             '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
-            '<div class="deal-rating-with-akte">'+starWidget(id)+'<div class="deal-inline-actions"><button type="button" data-open-dealakte="'+id+'" class="dealakte-inline-button rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">Dealakte</button>'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'<button type="button" data-deal-close="'+id+'" data-deal-restore="'+(closedDealIds.has(String(deal.id))?'true':'false')+'" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-800">'+(closedDealIds.has(String(deal.id))?'↶ Deal reaktivieren':'○ Deal beenden')+'</button></div></div>'+
+            '<div class="deal-rating-with-akte">'+starWidget(id)+'<div class="deal-inline-actions" role="group" aria-label="Deal-Aktionen">'+
+              '<button type="button" data-open-dealakte="'+id+'" class="dealakte-inline-button deal-toolbar-primary" aria-label="Dealakte öffnen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5h6l2 2H20v13H4z"/><path d="M4 9h16"/></svg>Dealakte</button>'+
+              '<span class="deal-toolbar-divider" aria-hidden="true"></span>'+
+              actions.map(([action,label])=>'<button type="button" class="deal-action deal-toolbar-secondary '+(action==='REJECT'?'deal-toolbar-reject':'')+'" data-action="'+action+'" data-deal-id="'+id+'">'+(action==='LEARN'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5c-4-3-9 0-8 5-2 4 1 8 5 8 1 2 4 2 5 0 4 0 7-4 5-8 1-5-4-8-7-5z"/><path d="M12 5v13M8 9l4 3m4-3-4 3"/></svg>Langzeithirn':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Ablehnen')+'</button>').join('')+
+              '<details class="deal-toolbar-menu"><summary aria-label="Weitere Deal-Aktionen" title="Weitere Aktionen"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></summary><div class="deal-toolbar-dropdown"><button type="button" data-deal-close="'+id+'" data-deal-restore="'+(closedDealIds.has(String(deal.id))?'true':'false')+'">'+(closedDealIds.has(String(deal.id))?'Deal reaktivieren':'Deal beenden')+'</button></div></details>'+
+            '</div></div>'+
             '</article>';
         }
         // ORACLE is the sole source of calculation-grade B2C prices.
