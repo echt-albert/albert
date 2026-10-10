@@ -833,6 +833,34 @@
       const keyClose = event => { if (event.key === 'Escape') close({target:modal.querySelector('[data-result-close]')}); };
       modal.addEventListener('click', close); document.addEventListener('keydown', keyClose);
     }
+    const activeCipherResearch = new Set();
+    async function searchCipherIdentity(dealId) {
+      const id=String(dealId);
+      if(activeCipherResearch.has(id))return;
+      const deal=window.albertDealsById?.get(id);
+      if(!deal){showStatus('Deal nicht gefunden.',true);return;}
+      activeCipherResearch.add(id);
+      setAlbertActivity('cipher-'+id,'CIPHER · '+(deal.product_name||'Produktidentität'),'Recherchiert EAN, MPN und Produktidentität …');
+      await fetchDeals();
+      try {
+        const response=await fetch(SUPABASE_URL+'/functions/v1/albert-cipher',{
+          method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
+          body:JSON.stringify({product:deal}),signal:AbortSignal.timeout(35000)
+        });
+        const data=await response.json();
+        if(!response.ok||!data.success)throw Error(data.error||'CIPHER-Recherche fehlgeschlagen.');
+        const {error}=await supabaseClient.from('discoveries').update({cipher_research:data.report}).eq('id',dealId);
+        if(error)throw error;
+        finishAlbertActivity('cipher-'+id,'CIPHER',(data.report?.results?.length||0)+' Recherchehinweise gespeichert. Identität und Konformität noch nicht verifiziert.',false);
+      }catch(e){
+        finishAlbertActivity('cipher-'+id,'CIPHER',e.message||String(e),true);
+        showStatus('CIPHER: '+(e.message||e),true);
+      }finally{activeCipherResearch.delete(id);await fetchDeals();}
+    }
+    document.getElementById('deals-container').addEventListener('click',event=>{
+      const button=event.target.closest('[data-cipher-search]');
+      if(button){event.stopPropagation();searchCipherIdentity(button.dataset.cipherSearch);}
+    });
     const activeOracleSearch = new Set();
     async function searchOraclePrices(dealId) {
       const id=String(dealId);
@@ -1818,7 +1846,12 @@
 
                 </div>
 
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action">Prüfung & Entscheidung öffnen ↗</button>
+              <div class="text-[11px] text-slate-600">
+                  ${deal.cipher_research?.checked_at ? '<p class="font-semibold text-slate-700 mb-2">Recherche: '+escapeHtml(new Date(deal.cipher_research.checked_at).toLocaleDateString('de-DE'))+' · noch nicht verifiziert</p>' : '<p class="text-slate-400">Noch keine gezielte Identitätsrecherche.</p>'}
+                  ${(deal.cipher_research?.results||[]).slice(0,4).map(hit=>'<div class="mt-2"><a href="'+safeUrl(hit.url)+'" target="_blank" rel="noopener noreferrer" class="text-sky-800 underline break-words">'+escapeHtml(hit.title||'Recherchehinweis')+' ↗</a>'+(hit.ean_mentioned||hit.mpn_mentioned?'<span class="text-amber-700"> · Kennung im Suchtreffer</span>':'')+'</div>').join('')}
+                  ${deal.cipher_research?.checked_at?'<p class="mt-2 text-amber-800">Suchtreffer sind keine verifizierten Produkt- oder Compliance-Nachweise.</p>':''}
+                </div>
+                <button type="button" data-cipher-search="${deal.id}" ${activeCipherResearch.has(String(deal.id))?"disabled":""} class="division-action disabled:opacity-50">${activeCipherResearch.has(String(deal.id))?'◌ Recherche läuft …':deal.cipher_research?.checked_at?'↻ Recherche':'Recherche'}</button>
               </div>
 
 
