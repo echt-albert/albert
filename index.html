@@ -345,6 +345,12 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .dealakte-top-actions>[data-spuersinn-clear]{margin-top:0!important;white-space:nowrap}
     @media(max-width:700px){.deal-workspace .dealakte-top-row{align-items:flex-start}.deal-workspace .dealakte-top-actions{gap:5px}.deal-workspace .dealakte-top-actions>[data-spuersinn-kind],.deal-workspace .dealakte-top-actions>[data-spuersinn-clear]{white-space:normal}}
 
+    /* Identische Spürsinn-Darstellung wie in der Deal-Karte; Zurück links davon. */
+    .deal-workspace .dealakte-top-actions .deal-header-spuersinn{display:flex;align-items:center}
+    .deal-workspace .dealakte-top-actions .deal-header-spuersinn>[data-spuersinn-kind],
+    .deal-workspace .dealakte-top-actions .deal-header-spuersinn>[data-spuersinn-clear]{margin:0!important}
+    @media(max-width:700px){.deal-workspace .dealakte-top-actions .deal-header-spuersinn{max-width:100%}}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
@@ -2778,7 +2784,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         return `
 
           <article id="deal-card-${dealId}" data-scanner-import="${String(deal.offer_url||'').startsWith('scanner://import/')}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#24a1d6] border-[#24a1d6] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            <div class="dealakte-top-row"><div class="dealakte-top-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</div><div class="dealakte-top-actions">${spuersinnHtml(deal)}<button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div></div>
+            <div class="dealakte-top-row"><div class="dealakte-top-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</div><div class="dealakte-top-actions"><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button><div class="deal-header-spuersinn">${spuersinnHtml(deal)}</div></div></div>
             <!-- DEAL HEADER -->
 
             <div class="deal-header deal-header-refined">
