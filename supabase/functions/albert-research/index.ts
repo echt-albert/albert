@@ -79,7 +79,7 @@ function sourceHost(value: unknown): string | null {
   try {
     const u = new URL(text(value));
     if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-    const host = u.hostname.toLowerCase().replace(/^www\\./, "");
+    const host = u.hostname.toLowerCase().replace(/^www[.]/, "");
     if (!host.includes(".") || host === "localhost" || host.endsWith(".local")) return null;
     if (["vertexaisearch.cloud.google.com", "google.com", "google.de", "googleusercontent.com",
       "translate.google.com", "webcache.googleusercontent.com"].includes(host)) return null;
