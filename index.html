@@ -2149,6 +2149,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
+                year: 'numeric',
+                timeZone: 'Europe/Berlin',
                 day: '2-digit',
                 month: '2-digit'
               }
@@ -2223,7 +2225,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                 <span aria-hidden="true">·</span>
                 <span>${deal.hunt_origin === 'SOFORT' ? 'Sofort-Jagd' : 'Permanente Jagd'}</span>
                 <span aria-hidden="true">·</span>
-                <span>${escapeHtml(formattedDate)}</span>
+                <span title="Zeitpunkt der Speicherung des Deals in Albert (deutsche Ortszeit)">Entdeckt: ${escapeHtml(formattedDate)} Uhr</span>
                 <span aria-hidden="true">·</span>
                 <span>#${escapeHtml(deal.research_run_id || '—')}</span>
               </div>
