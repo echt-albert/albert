@@ -222,7 +222,6 @@
 .deal-compact .deal-header{margin-bottom:0!important}
 .deal-compact .deal-header .deal-header-actions{display:flex!important;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .deal-header-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.deal-header-actions button[aria-label="Deal bewerten"]{display:inline-flex!important;visibility:visible!important;white-space:nowrap}
 .deal-initial-grade{display:inline-flex;align-items:center;gap:8px;padding:6px 9px 6px 11px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;white-space:nowrap}
 .deal-initial-grade-label{font-size:10px;font-weight:600;letter-spacing:.01em}
 .deal-initial-grade strong{display:inline-flex;align-items:center;justify-content:center;min-width:27px;height:27px;border-radius:8px;background:#e2e8f0;font-size:13px;font-weight:800}
@@ -2410,7 +2409,6 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                 <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
                   <span>KI</span><strong>${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : '—'}</strong>
                 </span>
-                <button type="button" data-deal-id="${dealId}" onclick="openVerdictChoices('${dealId}')" class="deal-evaluate-button" aria-label="Deal bewerten">Deal bewerten ↗</button>
               </div>
               <div class="deal-header-meta">
                 <span title="${escapeHtml(deepStatus.detail)}">${escapeHtml(deepStatus.label)}</span>
