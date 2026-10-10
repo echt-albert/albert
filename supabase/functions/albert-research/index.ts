@@ -72,6 +72,65 @@ async function buyerDiscoveryMemory(db: any): Promise<string> {
     "Keine automatische Bewertung, Rangfolge, Ablehnung oder Ausfilterung aufgrund dieser Rückmeldungen.";
 }
 
+
+// Source memory is descriptive, not a supplier score: DEEP_DIVE is a request to check, not a purchase signal.
+// Use hostname only; no redirect hosts, tracking proxies, private notes or offer URLs in the model prompt.
+function sourceHost(value: unknown): string | null {
+  try {
+    const u = new URL(text(value));
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    const host = u.hostname.toLowerCase().replace(/^www\\./, "");
+    if (!host.includes(".") || host === "localhost" || host.endsWith(".local")) return null;
+    if (["vertexaisearch.cloud.google.com", "google.com", "google.de", "googleusercontent.com",
+      "translate.google.com", "webcache.googleusercontent.com"].includes(host)) return null;
+    return host;
+  } catch { return null; }
+}
+async function sourceDiscoveryMemory(db: any): Promise<string> {
+  const [deals, feedback] = await Promise.all([
+    db.from("discoveries").select("id,offer_url").order("discovered_at", { ascending: false }).limit(500),
+    db.from("deal_feedback").select("discovery_id,action,id").order("id", { ascending: false }).limit(300)
+  ]);
+  if (deals.error || feedback.error || !deals.data?.length) return "";
+  const sources = new Map<string, { total: number; rated: number; review: number; watch: number; reject: number; learn: number }>();
+  const dealHosts = new Map<string,string>();
+  for (const row of deals.data) {
+    const host = sourceHost(row.offer_url);
+    if (!host) continue;
+    dealHosts.set(String(row.id), host);
+    const x = sources.get(host) || { total: 0, rated: 0, review: 0, watch: 0, reject: 0, learn: 0 };
+    x.total++;
+    sources.set(host,x);
+  }
+  const seen = new Set<string>();
+  for (const row of feedback.data || []) {
+    const id = String(row.discovery_id ?? "");
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const host = dealHosts.get(id);
+    if (!host) continue;
+    const x = sources.get(host)!;
+    if (row.action === "DEEP_DIVE") { x.rated++; x.review++; }
+    else if (row.action === "WATCH") { x.rated++; x.watch++; }
+    else if (row.action === "REJECT") { x.rated++; x.reject++; }
+    else if (row.action === "LEARN") { x.rated++; x.learn++; }
+  }
+  const sorted = [...sources.entries()].sort((a,b) => b[1].total-a[1].total);
+  if (!sorted.length) return "";
+  const top = sorted.slice(0, 7).map(([host,x]) =>
+    host + ": " + x.total + " Funde, " + x.rated + " bewertet (" +
+    x.review + " Marktprüfungen, " + x.watch + " Beobachtungen, " +
+    x.reject + " Ablehnungen, " + x.learn + " Lernnotizen)").join("; ");
+  return "BISHERIGE QUELLENABDECKUNG (nur historische Beobachtung, keine Qualitätswertung): " +
+    top + ". " + sources.size + " unterschiedliche echte Angebotsdomains im Verlauf. " +
+    "Suche bewusst auch bei bisher NICHT vertretenen, konkreten Lieferanten und Liquidatoren; " +
+    "wiederhole nicht überwiegend die größten bisherigen Portale. " +
+    "Mindestens zwei der 3–5 Vorschläge sollen nach Möglichkeit von neuen Angebotsdomains stammen. " +
+    "Bekannte Quellen bleiben erlaubt. DEEP_DIVE bedeutet nur Prüfauftrag, nicht guter Deal; " +
+    "REJECT bezieht sich auf ein Angebot, nicht auf einen generellen Lieferantenausschluss. " +
+    "Keine automatische Bewertung oder Filterung.";
+}
+
 // URLs are syntactically checked, but not fetched from the server.
 // Server-side arbitrary URL fetches would create an SSRF risk.
 serve(async req => {
@@ -96,7 +155,10 @@ serve(async req => {
     const created = await db.from("research_runs").insert({ status: "running" }).select("id").single();
     if (created.error) throw created.error;
     runId = created.data.id;
-    const buyerMemory = await buyerDiscoveryMemory(db).catch(() => "");
+    const [buyerMemory, sourceMemory] = await Promise.all([
+      buyerDiscoveryMemory(db).catch(() => ""),
+      sourceDiscoveryMemory(db).catch(() => "")
+    ]);
     const ai = new GoogleGenAI({ apiKey: key });
     // One grounded model call; no unbounded retries or surprise cost multiplication.
     const response = await ai.models.generateContent({
@@ -104,6 +166,7 @@ serve(async req => {
       contents: `Du bist RADAR, ein erfahrener kategorieunabhängiger B2B-Schnäppchenjäger für den deutschen B2C-Handel.
 Auftrag: ${query}
 ${buyerMemory}
+${sourceMemory}
 ZIEL: Entdecke 3–5 unterschiedliche KONKRETE, öffentlich auffindbare B2B-Warenangebote mit nachvollziehbarer URL. Suche nach Verkäuferdruck, nicht nur nach Produktnamen.
 SUCHE BREIT IN MEHREREN SUCHRICHTUNGEN:
 1. Lagerüberhang, Overstock, Sortimentswechsel, Auftragsstorno und Distributor-Abverkauf.
