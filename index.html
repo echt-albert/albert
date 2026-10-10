@@ -340,6 +340,11 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-compact .dealakte-top-row{display:none}
     @media(max-width:550px){.deal-workspace .dealakte-top-title{font-size:16px}}
 
+    .deal-workspace .dealakte-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+    .deal-workspace .dealakte-top-actions>[data-spuersinn-kind],
+    .deal-workspace .dealakte-top-actions>[data-spuersinn-clear]{margin-top:0!important;white-space:nowrap}
+    @media(max-width:700px){.deal-workspace .dealakte-top-row{align-items:flex-start}.deal-workspace .dealakte-top-actions{gap:5px}.deal-workspace .dealakte-top-actions>[data-spuersinn-kind],.deal-workspace .dealakte-top-actions>[data-spuersinn-clear]{white-space:normal}}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
@@ -2773,7 +2778,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         return `
 
           <article id="deal-card-${dealId}" data-scanner-import="${String(deal.offer_url||'').startsWith('scanner://import/')}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#24a1d6] border-[#24a1d6] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-            <div class="dealakte-top-row"><div class="dealakte-top-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</div><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
+            <div class="dealakte-top-row"><div class="dealakte-top-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</div><div class="dealakte-top-actions">${spuersinnHtml(deal)}<button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div></div>
             <!-- DEAL HEADER -->
 
             <div class="deal-header deal-header-refined">
@@ -2784,7 +2789,6 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
                   <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
                 </div>
                 ${supplierHeaderLine}
-                ${spuersinnHtml(deal)}
               </div>
               <div class="deal-header-actions">
                 <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
