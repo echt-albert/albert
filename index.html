@@ -259,7 +259,7 @@
 .albert-right-rail{display:none!important}
 body.albert-chat-open .albert-right-rail{display:block!important;position:fixed;right:24px;bottom:85px;top:auto;width:min(390px,calc(100vw - 32px));z-index:75;box-shadow:0 18px 55px #0f172a26;border-radius:18px;background:white}
 body.albert-chat-open .albert-communicator{box-shadow:0 18px 55px #0f172a26}
-.albert-chat-toggle{position:fixed;right:24px;bottom:24px;z-index:76;background:#0f172a;color:white;border-radius:999px;padding:13px 18px;font-size:13px;font-weight:600;box-shadow:0 8px 24px #0f172a30}
+.albert-chat-toggle{position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:24px;z-index:76;background:#0f172a;color:white;border-radius:999px;padding:13px 18px;font-size:13px;font-weight:600;box-shadow:0 8px 24px #0f172a30}
 .albert-chat-toggle:hover{background:#263449}
 .albert-auth-panel{display:none!important}
 body.albert-account-open .albert-auth-panel{display:block!important}
@@ -295,6 +295,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       </div>
 
+      <button type="button" id="source-radar-nav" onclick="toggleSourceRadar()" aria-pressed="false" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Deal-Ablage">
         <button type="button" data-view="SOFORT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>⚡ Sofort-Jagd</span><span data-count="SOFORT" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="WATCH" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
@@ -305,6 +306,9 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         </button>
         <button type="button" data-view="LEARN" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
           <span>🧠 Erfahrung festhalten</span><span data-count="LEARN" class="font-mono text-[11px]">–</span>
+        </button>
+        <button type="button" data-view="REJECT" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50">
+          <span>✕ Abgelehnt</span><span data-count="REJECT" class="font-mono text-[11px]">–</span>
         </button>
       </nav>
       <details class="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500"><summary class="cursor-pointer py-2">Weitere Filter</summary><div class="mt-3"><div class="mb-2 font-semibold">Kategorien</div><div id="category-filters" class="flex flex-wrap gap-1.5"></div><div class="mb-2 mt-4 font-semibold">Bewertung</div><div id="grade-filters" class="flex flex-wrap gap-1.5"></div></div></details>
@@ -389,6 +393,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
         <div class="min-w-0">
 
+          <section id="source-panel" class="hidden mb-6 bg-white border rounded-2xl p-6"><div class="flex justify-between"><div><h2 class="font-semibold text-xl">🛰️ Quellenradar</h2><p class="text-xs text-slate-500 mt-2">Lieferanten aus Alberts bisherigen Recherchen. Du entscheidest.</p></div><button onclick="toggleSourceRadar(false)" class="text-xs">Schließen ×</button></div><p class="text-xs bg-amber-50 p-3 rounded-lg mt-4">Quellen aus bisherigen Deals und eigenständiger Web-Recherche. Entscheidungen werden derzeit nur in diesem Browser gespeichert; neue Quellen müssen vor Kontaktaufnahme verifiziert werden.</p><div class="flex gap-3 items-center mt-4"><button type="button" id="source-research-button" onclick="startSourceResearch()" class="bg-slate-900 text-white px-4 py-3 rounded-xl text-xs font-semibold">🛰️ Neue Bezugsquellen suchen</button><span id="source-research-status" role="status" class="text-xs text-slate-600"></span></div><input id="source-search" oninput="renderSourceRadar()" placeholder="Quelle suchen …" class="w-full border rounded-lg p-3 text-xs mt-4"><div id="source-results" class="space-y-3 mt-4"></div></section>
           <div id="deals-container" class="space-y-6">
 
             <div class="text-center py-24 text-slate-400 text-sm mono">
@@ -495,6 +500,38 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <!-- ===================================================== -->
 
   <script>
+
+
+let radarDeals=[];let researchedSources=[];
+function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
+function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
+function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);const nav=document.getElementById('source-radar-nav');if(nav){nav.classList.toggle('bg-amber-50',show);nav.classList.toggle('text-amber-800',show);nav.classList.toggle('font-semibold',show);nav.classList.toggle('ring-1',show);nav.classList.toggle('ring-amber-300',show);nav.setAttribute('aria-pressed',String(show));}document.querySelectorAll('.deal-view').forEach(button=>{const selected=!show&&button.dataset.view===activeDealView;button.classList.toggle('bg-amber-50',selected);button.classList.toggle('text-amber-900',selected);button.classList.toggle('border',selected);button.classList.toggle('border-amber-200',selected);button.classList.toggle('font-semibold',selected);});if(show){renderSourceRadar();loadResearchedSources()}}
+async function loadResearchedSources(){
+const {data,error}=await supabaseClient.from('sourcing_sources').select('*').order('discovered_at',{ascending:false}).limit(100);
+if(!error){researchedSources=data||[];renderSourceRadar();}
+}
+async function startSourceResearch(){
+const button=document.getElementById('source-research-button'),status=document.getElementById('source-research-status');
+const {data:{session}}=await supabaseClient.auth.getSession();
+if(!session){status.textContent='Bitte zuerst beim Einkäufer-Konto anmelden.';return;}
+button.disabled=true;button.textContent='Recherche läuft …';status.textContent='Albert sucht neue Lieferanten. Das kann etwas dauern.';
+try{
+const response=await fetch(SUPABASE_URL+'/functions/v1/albert-source-research',{method:'POST',headers:{'content-type':'application/json','apikey':SUPABASE_ANON_KEY,'authorization':'Bearer '+session.access_token},body:'{}'});
+const result=await response.json();
+if(!response.ok||!result.success)throw Error(result.error||'Recherche fehlgeschlagen');
+status.textContent=(result.saved||0)+' neue Bezugsquellen gespeichert.';
+await loadResearchedSources();
+}catch(e){status.textContent='Recherchefehler: '+e.message;}
+finally{button.disabled=false;button.textContent='🛰️ Neue Bezugsquellen suchen';}
+}
+function renderSourceRadar(){
+const out=document.getElementById('source-results');if(!out)return;
+const m=new Map();for(const d of radarDeals){const name=String(d.supplier_name||'').trim();if(!name||/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(name))continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:''});const x=m.get(key);x.count++;if(!x.url&&d.offer_url)x.url=typeof safeUrl==='function'?safeUrl(d.offer_url):''}
+for(const x of researchedSources){const name=String(x.name||'').trim();if(!name)continue;const key=name.toLocaleLowerCase('de');if(!m.has(key))m.set(key,{name,key,count:0,url:x.evidence_url||x.website||'',research:true,reason:x.reason||'',opportunity:x.opportunity||''});else{const row=m.get(key);row.research=true;row.reason=x.reason||'';row.opportunity=x.opportunity||'';if(!row.url)row.url=x.evidence_url||x.website||'';}}const rows=[...m.values()].sort((a,b)=>b.count-a.count);document.getElementById('source-count').textContent=rows.length;
+const q=(document.getElementById('source-search').value||'').toLocaleLowerCase('de');const state=radarState();const labels={call:'📞 Anrufen',mail:'✉️ Mailen',watch:'👁️ Beobachten',check:'📋 Angebot prüfen',reject:'✕ Verwerfen'};
+out.innerHTML=rows.filter(x=>x.name.toLocaleLowerCase('de').includes(q)).map(x=>'<article class="border rounded-xl p-4"><div class="flex justify-between gap-3"><div><strong class="text-sm">'+escapeHtml(x.name)+'</strong><p class="text-xs text-slate-500">'+x.count+' Deals'+(x.research?' · Neue Bezugsquelle':'')+' · '+(labels[state[x.key]?.action]||'Noch offen')+'</p></div>'+(x.url?'<a class="text-xs underline" href="'+escapeHtml(x.url)+'" target="_blank" rel="noopener noreferrer">Fundstelle ↗</a>':'')+'</div>'+(x.research?'<p class="text-xs mt-2 text-slate-600">'+escapeHtml(x.opportunity||'')+' · '+escapeHtml(x.reason||'')+'</p>':'')+'<div class="flex gap-2 flex-wrap mt-3">'+Object.entries(labels).map(([a,l])=>'<button type="button" data-radar-key="'+escapeHtml(x.key)+'" data-radar-action="'+a+'" class="border rounded-lg px-3 py-2 text-xs '+(state[x.key]?.action===a?'bg-slate-900 text-white':'hover:bg-slate-50')+'">'+l+'</button>').join('')+'</div></article>').join('')||'<p class="text-xs text-slate-500">Noch keine Quellen vorhanden.</p>';
+out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click',()=>radarSave(b.dataset.radarKey,b.dataset.radarAction)));
+}
 
     // =======================================================
     // SUPABASE
@@ -1015,10 +1052,12 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     function oracleMarketCard(deal) {
       const report=oracleReport(deal);
       const offers=(Array.isArray(report?.shopping_results)?report.shopping_results:[])
-        .filter(x=>x?.merchant&&safeUrl(x.url)&&x.display_price).slice(0,3);
+        .filter(x=>x?.merchant&&safeUrl(x.url)&&x.display_price)
+        .sort((a,b)=>Number(b.identity_match==='IDENTIFIER_IN_RESULT')-Number(a.identity_match==='IDENTIFIER_IN_RESULT'))
+        .slice(0,3);
       if(!offers.length)return '<p class="text-xs text-slate-400">Noch keine Ergebnisse.</p>';
       return '<div class="space-y-1">'+offers.map(x=>
-        '<div class="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0"><a class="min-w-0 truncate text-cyan-700 hover:underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><span class="mono shrink-0 text-slate-800">'+escapeHtml(String(x.display_price))+'</span></div>'
+        '<div class="flex items-start justify-between gap-2 py-2 border-b border-slate-100 last:border-0"><div class="min-w-0"><a class="block truncate text-cyan-700 hover:underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><div class="text-[10px] text-slate-500 break-words">'+escapeHtml(x.title||'Produktbezeichnung fehlt')+'</div><div class="text-[10px] '+(x.identity_match==='IDENTIFIER_IN_RESULT'?'text-emerald-700':'text-amber-700')+'">'+(x.identity_match==='IDENTIFIER_IN_RESULT'?'✓ Kennung im Treffer':'⚠ Produktidentität ungeprüft')+'</div></div><span class="mono shrink-0 text-slate-800">'+escapeHtml(String(x.display_price))+'</span></div>'
       ).join('')+'</div><p class="mt-2 text-[10px] text-slate-400">KI-Preisindikation · nicht geprüft</p>';
     }
     const activeOracleSearch = new Set();
@@ -1246,7 +1285,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     function renderQuickMarket(id,data){
       const el=document.querySelector('[data-quick-market="'+id+'"]');if(!el)return;
       const eur=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
-      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">Keine Preisindikation gefunden · ungeprüft</span>';return;}
+      const deal=window.albertDealsById?.get(String(id))||{};
+      const terms=[deal.brand,deal.mpn,deal.product_name].filter(Boolean).join(' ').trim()||deal.ean_gtin||'';
+      const googleLink=terms?'<a class="text-cyan-700 underline ml-2" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=shop&gl=de&hl=de&q='+encodeURIComponent(terms)+'">Google Shopping ↗</a>':'';
+      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">'+(data?.error?'Preisabfrage fehlgeschlagen · erneut versuchen':data?.reason?'Keine Treffer: '+escapeHtml(data.reason):'Keine Preisindikation gefunden · ungeprüft')+'</span>'+googleLink;return;}
       const lo=data.low_eur||data.cheapest_price_eur,hi=data.high_eur;
       const range=hi&&hi>lo?eur(lo)+'–'+eur(hi):'ab '+eur(lo);
       const link=data.cheapest_url?'<a class="text-cyan-700 underline" target="_blank" rel="noopener noreferrer" href="'+escapeHtml(data.cheapest_url)+'">'+escapeHtml(data.cheapest_merchant||'Anbieter')+' ↗</a>':escapeHtml(data.cheapest_merchant||'');
@@ -1261,8 +1303,8 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span>';
         quickMarketInFlight.add(id);
         fetch(SUPABASE_URL+'/functions/v1/albert-quick-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({product:{product_name:deal.product_name,brand:deal.brand,ean_gtin:deal.ean_gtin,mpn:deal.mpn}}),signal:AbortSignal.timeout(28000)})
-          .then(r=>r.json()).then(data=>{quickMarketCache.set(id,data);renderQuickMarket(id,data);})
-          .catch(()=>{const data={success:false};quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||"HTTP "+r.status);return data;}).then(data=>{if(data?.success&&(data.low_eur||data.cheapest_price_eur))quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .catch(error=>{console.warn("Marktpreisabfrage fehlgeschlagen",id,error);renderQuickMarket(id,{success:false,error:String(error)});})
           .finally(()=>quickMarketInFlight.delete(id));
       }
     }
@@ -1302,7 +1344,28 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
-    const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Zunächst ablehnen' };
+    let activeSpuersinnFilter = null;
+    document.getElementById('deals-container').addEventListener('click', event => {
+      const link = event.target.closest('[data-spuersinn-kind]');
+      if (link) {
+        activeSpuersinnFilter = { kind: link.dataset.spuersinnKind, value: link.dataset.spuersinnValue };
+        activeDealView = 'ALL';
+        activeCategoryFilter = null;
+        activeGradeFilter = null;
+        dealExpansion.clear();
+        fetchDeals();
+        return;
+      }
+      if (event.target.closest('[data-spuersinn-clear]')) {
+        activeSpuersinnFilter = null;
+        activeDealView = 'SOFORT';
+        activeCategoryFilter = null;
+        activeGradeFilter = null;
+        dealExpansion.clear();
+        fetchDeals();
+      }
+    });
+    const dealViewNames = { ALL: 'Alle Deals', INBOX: 'Intelligence Feed', SOFORT: 'Sofort-Jagd', WATCH: 'Watch', DEEP_DIVE: 'Deep Dive Market', LEARN: 'Langzeithirn (Lernen)', REJECT: 'Abgelehnt' };
     document.getElementById('deal-navigation').addEventListener('click', event => {
       const button = event.target.closest('[data-view]');
       if (!button) return;
@@ -1310,6 +1373,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
       dealExpansion.clear();
       activeDealView = nextView;
+      activeSpuersinnFilter = null;
       activeCategoryFilter = null;
       activeGradeFilter = null;
       fetchDeals();
@@ -1900,6 +1964,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       }
 
+      radarDeals=deals||[];renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
       const { data: savedCategories, error: categoryError } = await supabaseClient
         .from('deal_category_labels').select('discovery_id,category');
@@ -1925,14 +1990,19 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       for (const deal of deals || []) counts[dealFolder(deal)]++;
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
       document.querySelectorAll('.deal-view').forEach(button => {
-        const selected = button.dataset.view === activeDealView;
+        const selected = document.getElementById('source-panel')?.classList.contains('hidden') !== false && button.dataset.view === activeDealView;
         button.classList.toggle('bg-amber-50', selected);
         button.classList.toggle('text-amber-900', selected);
         button.classList.toggle('border', selected);
         button.classList.toggle('border-amber-200', selected);
         button.classList.toggle('font-semibold', selected);
       });
-      const folderDeals = activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => dealFolder(deal) === activeDealView);
+      const folderDeals = activeSpuersinnFilter ? (deals || []).filter(deal => {
+        if (activeSpuersinnFilter.kind === 'platform') {
+          try { return new URL(safeUrl(deal.offer_url)).hostname.toLowerCase().replace(/^www[.]/, '') === activeSpuersinnFilter.value; } catch { return false; }
+        }
+        return String(deal.supplier_name || '').trim().toLocaleLowerCase('de-DE') === activeSpuersinnFilter.value;
+      }) : activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => dealFolder(deal) === activeDealView);
       const categoryCounts = new Map();
       for (const deal of folderDeals) {
         const name = categoryName(deal);
@@ -1965,9 +2035,47 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       document.getElementById('grade-filters').innerHTML =
         gradeButton('Alle', categoryDeals.length, !activeGradeFilter, '__ALL__') +
         grades.map(grade => gradeButton(grade, gradeCounts.get(grade), activeGradeFilter === grade, grade)).join('');
+      // Alberts Spürsinn: Muster in bereits gespeicherten Deals, ohne KI-Kosten.
+      const sourceHost = deal => {
+        const url = safeUrl(deal.offer_url);
+        if (!url) return '';
+        try {
+          const host = new URL(url).hostname.toLowerCase().replace(/^www[.]/, '');
+          return host === 'vertexaisearch.cloud.google.com' ? '' : host;
+        } catch { return ''; }
+      };
+      const sourceCounts = new Map();
+      const supplierCounts = new Map();
+      const discoveryNotes = new Map();
+      const chronologicalDeals = [...(deals || [])].sort((a,b) => String(a.discovered_at||'').localeCompare(String(b.discovered_at||'')));
+      for (const candidate of chronologicalDeals) {
+        const host = sourceHost(candidate);
+        const supplier = String(candidate.supplier_name||'').trim();
+        const supplierKey = supplier && !/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(supplier) ? supplier.toLocaleLowerCase('de-DE') : '';
+        const previousSupplier = supplierKey ? (supplierCounts.get(supplierKey)||0) : 0;
+        const previousHost = host ? (sourceCounts.get(host)||0) : 0;
+        let note = '';
+        if (previousSupplier > 0) note = '🧠 Albert erinnert sich: Dieser Anbieter ist bereits bei '+previousSupplier+' weiteren Funden aufgetaucht.';
+        else if (host && previousHost === 0) note = '🔎 Alberts Spürsinn: Neue Plattform im Fundbestand – '+host+'.';
+        else if (host && previousHost > 0) note = '🔎 Alberts Spürsinn: '+previousHost+' weitere Funde von '+host+' sind bereits bekannt.';
+        if (note) discoveryNotes.set(String(candidate.id), {
+          note, kind: previousSupplier > 0 ? 'supplier' : 'platform',
+          value: previousSupplier > 0 ? supplierKey : host
+        });
+        if (host) sourceCounts.set(host, previousHost+1);
+        if (supplierKey) supplierCounts.set(supplierKey, previousSupplier+1);
+      }
+      const spuersinnHtml = deal => {
+        const info = discoveryNotes.get(String(deal.id));
+        if (!info) return '';
+        const filtered = activeSpuersinnFilter && activeSpuersinnFilter.kind === info.kind && activeSpuersinnFilter.value === info.value;
+        return filtered
+          ? '<button type="button" data-spuersinn-clear class="mt-2 block w-full rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:bg-cyan-100/70" title="Spürsinn-Filter entfernen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Filter entfernen ×</span></button>'
+          : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
+      };
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
-      const viewTitle = dealViewNames[activeDealView];
-      const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
+      const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
+      const viewHeading = '<div class="mb-4 flex items-center justify-between gap-3"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><div class="flex items-center gap-3"><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span>' + (activeSpuersinnFilter ? '<button type="button" data-spuersinn-clear class="rounded-lg border border-cyan-200 px-2.5 py-1 text-xs text-cyan-800 hover:bg-cyan-50">Filter entfernen ×</button>' : '') + '</div></div>';
 
       if (!visibleDeals.length) {
 
@@ -1996,13 +2104,16 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           const qty=Number(deal.quantity);
           const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
           const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+          const platformName=source ? (()=>{try { const host=new URL(source).hostname.replace(/^www[.]/,''); return host==='vertexaisearch.cloud.google.com' ? '' : host; } catch { return ''; }})() : '';
+          const supplierLabel=String(deal.supplier_name||'').trim();
+          const supplierHeader='<div class="mt-2 text-xs text-slate-600"><span class="font-semibold">Anbieter: </span>'+escapeHtml(supplierLabel||'Nicht bekannt')+(platformName?' <span class="text-slate-400">· Plattform: '+escapeHtml(platformName)+'</span>':'')+(source?' <a class="text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot ↗</a>':'')+'</div>';
           const signals=[deal.supplier_name?('Anbieter: '+deal.supplier_name):null].filter(Boolean);
           const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description,typeof deal.decision_reason==='string'&&deal.decision_reason.startsWith('RADAR-Hinweis (ungeprüft):')?deal.decision_reason.split(' · ')[0].replace('RADAR-Hinweis (ungeprüft): ',''):null].find(v=>typeof v==='string'&&v.trim());
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['WATCH','👁 Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
           return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
-            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p></div>'+
+            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+spuersinnHtml(deal)+'</div>'+
             '<span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">Fund · ungeprüft</span></div>'+
             '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
@@ -2061,6 +2172,8 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
+                year: 'numeric',
+                timeZone: 'Europe/Berlin',
                 day: '2-digit',
                 month: '2-digit'
               }
@@ -2086,6 +2199,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',SOFORT:'Neu',INBOX:'Neu'}[currentAction];
 
         const offerUrl = safeUrl(deal.offer_url);
+        const supplierName = String(deal.supplier_name || '').trim();
+        const platformDomain = offerUrl ? (() => { try { const host = new URL(offerUrl).hostname.replace(/^www[.]/, ''); return host === 'vertexaisearch.cloud.google.com' ? '' : host; } catch { return ''; } })() : '';
+        const supplierHeaderLine = '<div class="mt-1 text-xs text-slate-600"><span class="font-semibold">Anbieter: </span>' + escapeHtml(supplierName || 'Nicht bekannt') + (platformDomain ? ' <span class="text-slate-400">· Plattform: ' + escapeHtml(platformDomain) + '</span>' : '') + (offerUrl ? ' <a href="' + offerUrl + '" target="_blank" rel="noopener noreferrer" class="text-cyan-700 hover:underline">Angebot ↗</a>' : '') + '</div>';
+
 
         const offerLink = offerUrl
           ? `
@@ -2117,6 +2234,8 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                   <span>${escapeHtml(categoryName(deal))}</span>
                   <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
                 </div>
+                ${supplierHeaderLine}
+                ${spuersinnHtml(deal)}
               </div>
               <div class="deal-header-actions">
                 <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
@@ -2129,7 +2248,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                 <span aria-hidden="true">·</span>
                 <span>${deal.hunt_origin === 'SOFORT' ? 'Sofort-Jagd' : 'Permanente Jagd'}</span>
                 <span aria-hidden="true">·</span>
-                <span>${escapeHtml(formattedDate)}</span>
+                <span title="Zeitpunkt der Speicherung des Deals in Albert (deutsche Ortszeit)">Entdeckt: ${escapeHtml(formattedDate)} Uhr</span>
                 <span aria-hidden="true">·</span>
                 <span>#${escapeHtml(deal.research_run_id || '—')}</span>
               </div>
@@ -2366,7 +2485,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                   </section>
                   <section class="albert-analysis-panel" aria-label="Deine Kalkulation">
                     <h4 class="font-semibold text-sm text-slate-800 mb-2">Deine Kalkulation</h4>
-                    <div data-simple-calc="${dealId}" data-market="${(()=>{const p=(currentOracle?.shopping_results||[]).map(x=>Number(x.indicative_article_price)).filter(x=>Number.isFinite(x)&&x>0);return p.length?Math.min(...p):""})()}" data-ek="${hasPurchasePrice?purchasePrice:""}" data-blocked="${quantityExcluded}">
+                    <div data-simple-calc="${dealId}" data-market="${(()=>{const p=(currentOracle?.shopping_results||[]).filter(x=>x.identity_match==="IDENTIFIER_IN_RESULT").map(x=>Number(x.indicative_article_price)).filter(x=>Number.isFinite(x)&&x>0);return p.length?Math.min(...p):""})()}" data-ek="${hasPurchasePrice?purchasePrice:""}" data-blocked="${quantityExcluded}">
 <div class="space-y-2 text-xs"><div>KI-Marktpreis: <strong data-calc-market>—</strong></div><div>Unser VK (−20 %): <strong data-calc-vk>—</strong></div><div>EK / Stück: <strong data-calc-ek>—</strong></div></div>
 <div class="mt-3 space-y-2 text-xs">
 <label class="flex justify-between items-center gap-2">Marketing (%) <input data-simple-field="marketing" type="number" min="0" max="100" step="0.5" value="20" class="w-24 rounded border p-2 text-right"></label>
