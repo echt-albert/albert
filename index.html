@@ -1253,10 +1253,12 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       el.innerHTML='<strong>🇩🇪 B2C-Preis ungefähr: '+escapeHtml(range)+'</strong><span class="ml-2 text-slate-500">KI-Indikation · ungeprüft</span>'+(data.cheapest_price_eur?'<div class="mt-1 text-slate-600">Günstigster Hinweis: '+eur(data.cheapest_price_eur)+' · '+link+'</div>':'');
     }
     function loadQuickMarket(deals){
-      for(const deal of deals.slice(0,5)){
+      for(const deal of deals){
         const id=String(deal.id);
         if(quickMarketCache.has(id)){renderQuickMarket(id,quickMarketCache.get(id));continue;}
         if(quickMarketInFlight.has(id))continue;
+        const el=document.querySelector('[data-quick-market="'+id+'"]');
+        if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span>';
         quickMarketInFlight.add(id);
         fetch(SUPABASE_URL+'/functions/v1/albert-quick-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({product:{product_name:deal.product_name,brand:deal.brand,ean_gtin:deal.ean_gtin,mpn:deal.mpn}}),signal:AbortSignal.timeout(28000)})
           .then(r=>r.json()).then(data=>{quickMarketCache.set(id,data);renderQuickMarket(id,data);})
@@ -1264,6 +1266,14 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           .finally(()=>quickMarketInFlight.delete(id));
       }
     }
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('[data-quick-market-button]');
+      if(!button)return;
+      const id=String(button.dataset.quickMarketButton||'');
+      const deal=window.albertDealsById?.get(id);
+      if(!deal)return;
+      loadQuickMarket([deal]);
+    });
     let activeDealView = 'SOFORT';
     let activeCategoryFilter = null;
     let activeGradeFilter = null;
@@ -1973,7 +1983,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
             '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
-            '<div class="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/40 px-3 py-3 text-xs" data-quick-market="'+id+'"><strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span></div>'+
+            '<div class="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/40 px-3 py-3 text-xs" data-quick-market="'+id+'"><button type="button" class="font-semibold text-cyan-800 hover:underline" data-quick-market-button="'+id+'">🇩🇪 Marktpreis prüfen ↗</button><span class="ml-2 text-slate-500">Nur auf Klick · KI-Indikation, ungeprüft</span></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
             '<div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">'+actions.map(([action,label])=>'<button type="button" class="deal-action rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50" data-action="'+action+'" data-deal-id="'+id+'">'+label+'</button>').join('')+'</div>'+
             '</article>';
@@ -2502,7 +2512,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         `;
 
       }).join('');
-      if(activeDealView==='SOFORT')loadQuickMarket(visibleDeals);
+      // Market checks are buyer-triggered, never automatic.
 
       restoreSimpleCalc();
       // Offene Deal-Kacheln nach jedem Re-Render wiederherstellen.
