@@ -7,7 +7,7 @@ async function discover(plan, options = {}) {
   if (!url || !key) throw new Error("Sofort-Jagd: Supabase-Zugangsdaten fehlen.");
   const response = await fetchImpl(url.replace(/\/$/, "") + "/functions/v1/albert-research", {
     method: "POST",
-    headers: { "Content-Type": "application/json", apikey: key },
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: "Bearer " + key },
     body: JSON.stringify({ query: plan.query, origin: "SOFORT" }),
     signal: AbortSignal.timeout(140000)
   });
