@@ -1602,10 +1602,20 @@
         if (status) status.textContent = 'Nur lokal gespeichert · für dauerhafte Speicherung ist eine Anmeldung erforderlich.';
         return;
       }
-      const rows = [
-        {discovery_id:id,user_id:user.id,field_name:'return_rate_pct',buyer_value:rate},
-        {discovery_id:id,user_id:user.id,field_name:'return_cost_eur',buyer_value:cost}
+      const fields = [
+        ['rate','return_rate_pct'],['cost','return_cost_eur'],
+        ['shipping','shipping_eur'],['fees','platform_fee_eur'],
+        ['handling','handling_eur'],['other','other_cost_eur']
       ];
+      const rows = [];
+      for (const [field,name] of fields) {
+        const raw = section.querySelector('[data-return-field="'+field+'"]')?.value ?? '';
+        if (raw === '') continue;
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < 0 || (field === 'rate' && value > 100)) return;
+        rows.push({discovery_id:id,user_id:user.id,field_name:name,buyer_value:value});
+      }
+      if (!rows.length) return;
       const {error} = await supabaseClient.from('buyer_assumption_revisions').insert(rows);
       if (status) status.textContent = error ? 'Nur lokal gespeichert · Serverfehler: '+error.message : 'Als neue Einkäuferrevisionen sicher gespeichert.';
     }
@@ -1722,7 +1732,7 @@
         const {data,error} = await supabaseClient.from('buyer_assumption_revisions')
           .select('field_name,buyer_value,created_at')
           .eq('discovery_id',id)
-          .in('field_name',['return_rate_pct','return_cost_eur'])
+          .in('field_name',['return_rate_pct','return_cost_eur','shipping_eur','platform_fee_eur','handling_eur','other_cost_eur'])
           .order('created_at',{ascending:false})
           .limit(100);
         if (error) {
@@ -1737,7 +1747,7 @@
         }
         // Keine neuen Eingaben überschreiben, die während des asynchronen Ladens gemacht wurden.
         if (!section.isConnected || section.dataset.edited === 'yes') return;
-        for (const [name,field] of [['return_rate_pct','rate'],['return_cost_eur','cost']]) {
+        for (const [name,field] of [['return_rate_pct','rate'],['return_cost_eur','cost'],['shipping_eur','shipping'],['platform_fee_eur','fees'],['handling_eur','handling'],['other_cost_eur','other']]) {
           if (latest.has(name)) section.querySelector('[data-return-field="'+field+'"]').value = latest.get(name);
         }
         const values = Object.fromEntries([...section.querySelectorAll('[data-return-field]')].map(el => [el.dataset.returnField, el.value]));
