@@ -505,7 +505,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 let radarDeals=[];let researchedSources=[];
 function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
 function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
-function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);const nav=document.getElementById('source-radar-nav');if(nav){nav.classList.toggle('bg-amber-50',show);nav.classList.toggle('text-amber-800',show);nav.classList.toggle('font-semibold',show);nav.classList.toggle('ring-1',show);nav.classList.toggle('ring-amber-300',show);nav.setAttribute('aria-pressed',String(show));}if(show){renderSourceRadar();loadResearchedSources()}}
+function toggleSourceRadar(force){const p=document.getElementById('source-panel'),d=document.getElementById('deals-container'),show=typeof force==='boolean'?force:p.classList.contains('hidden');p.classList.toggle('hidden',!show);d.classList.toggle('hidden',show);const nav=document.getElementById('source-radar-nav');if(nav){nav.classList.toggle('bg-amber-50',show);nav.classList.toggle('text-amber-800',show);nav.classList.toggle('font-semibold',show);nav.classList.toggle('ring-1',show);nav.classList.toggle('ring-amber-300',show);nav.setAttribute('aria-pressed',String(show));}document.querySelectorAll('.deal-view').forEach(button=>{const selected=!show&&button.dataset.view===activeDealView;button.classList.toggle('bg-amber-50',selected);button.classList.toggle('text-amber-900',selected);button.classList.toggle('border',selected);button.classList.toggle('border-amber-200',selected);button.classList.toggle('font-semibold',selected);});if(show){renderSourceRadar();loadResearchedSources()}}
 async function loadResearchedSources(){
 const {data,error}=await supabaseClient.from('sourcing_sources').select('*').order('discovered_at',{ascending:false}).limit(100);
 if(!error){researchedSources=data||[];renderSourceRadar();}
@@ -1985,7 +1985,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       for (const deal of deals || []) counts[dealFolder(deal)]++;
       document.querySelectorAll('[data-count]').forEach(el => { el.textContent = counts[el.dataset.count] ?? 0; });
       document.querySelectorAll('.deal-view').forEach(button => {
-        const selected = button.dataset.view === activeDealView;
+        const selected = document.getElementById('source-panel')?.classList.contains('hidden') !== false && button.dataset.view === activeDealView;
         button.classList.toggle('bg-amber-50', selected);
         button.classList.toggle('text-amber-900', selected);
         button.classList.toggle('border', selected);
