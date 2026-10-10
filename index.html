@@ -481,7 +481,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           <input type="file" id="list-scanner-input" accept=".csv,text/csv" class="sr-only" aria-label="CSV hochladen">
         </div>
         <div id="list-scanner-result" class="hidden mt-5 rounded-2xl border border-slate-200 bg-white p-6" role="status" aria-live="polite"></div>
-        <p class="mt-5 text-xs text-slate-400">Noch kein Import in die Deal-Datenbank und keine automatische Analyse.</p>
+        <section id="list-scanner-preview" class="hidden mt-6 rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm" aria-label="CSV-Tabellenvorschau"></section>\n        <p class="mt-5 text-xs text-slate-400">Noch kein Import in die Deal-Datenbank und keine automatische Analyse.</p>
       </section>
       <div class="albert-layout" id="albert-deals-layout">
 
@@ -608,25 +608,82 @@ function closeListScanner(){
   document.getElementById('albert-deals-layout')?.classList.remove('hidden');
   const btn=document.getElementById('list-scanner-nav');btn?.setAttribute('aria-expanded','false');btn?.classList.remove('bg-cyan-50','text-cyan-800');
 }
-function countCsvRows(raw){
-  // Count logical records, not line breaks within quoted fields.
-  const sep=(raw.split(/\r?\n/,1)[0].match(/;/g)||[]).length>(raw.split(/\r?\n/,1)[0].match(/,/g)||[]).length?';':',';
-  let quoted=false,records=0,nonEmpty=false;
-  for(let i=0;i<raw.length;i++){const c=raw[i];if(c==='"'){if(quoted&&raw[i+1]==='"'){i++;continue;}quoted=!quoted;}else if(!quoted&&(c==='\n'||c==='\r')){if(nonEmpty)records++;nonEmpty=false;if(c==='\r'&&raw[i+1]==='\n')i++;}else if(c.trim())nonEmpty=true;}
-  if(nonEmpty)records++;
-  return {rows:Math.max(0,records-1),separator:sep,valid:!quoted};
+// CSV is kept in memory only. No database writes or remote AI calls.
+let scannerData=null;
+function parseScannerCsv(raw){
+ const first=raw.replace(/^\uFEFF/,'').split(/\r?\n/,1)[0];
+ const sep=[';',',','\t'].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+ let rows=[],row=[],cell='',quoted=false;
+ raw=raw.replace(/^\uFEFF/,'');
+ for(let i=0;i<raw.length;i++){
+  const c=raw[i];
+  if(c==='"'){if(quoted&&raw[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}
+  else if(!quoted&&c===sep){row.push(cell);cell='';}
+  else if(!quoted&&(c==='\n'||c==='\r')){row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell='';if(c==='\r'&&raw[i+1]==='\n')i++;}
+  else cell+=c;
+ }
+ if(quoted)throw Error('Anführungszeichen in der CSV sind nicht geschlossen.');
+ row.push(cell);if(row.some(v=>v.trim()))rows.push(row);
+ if(!rows.length)throw Error('Die CSV ist leer.');
+ const headers=rows.shift().map(v=>v.trim());if(!headers.some(Boolean))throw Error('Keine Spaltenüberschriften gefunden.');
+ const duplicate=headers.filter((h,i)=>h&&headers.indexOf(h)!==i);if(duplicate.length)throw Error('Doppelte Spaltenüberschrift: '+duplicate[0]);
+ return {headers,rows,separator:sep};
+}
+function scannerEl(tag,cls,txt){const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=String(txt);return el;}
+function scannerCheckRows(data){
+ const keys=data.headers,find=(...names)=>keys.findIndex(h=>names.includes(h.toLowerCase()));
+ const product=find('produktname','artikelbezeichnung','bezeichnung','artikel');
+ const quantity=find('verfuegbare_menge','menge','anzahl','stückzahl');
+ const price=find('preis_netto_eur','ek_netto','ek','preis');
+ const basis=find('preisbasis','preiseinheit');
+ const ean=find('ean_gtin','ean','gtin');
+ const findings=data.rows.map((row,i)=>{
+  const issues=[];if(product>=0&&!row[product]?.trim())issues.push('Produktname fehlt');
+  if(quantity>=0&&row[quantity]?.trim()&&!Number.isFinite(Number(row[quantity].replace(',','.'))))issues.push('Menge nicht numerisch');
+  if(price>=0&&row[price]?.trim()&&!Number.isFinite(Number(row[price].replace(',','.'))))issues.push('Preis nicht numerisch');
+  if(price>=0&&row[price]?.trim()&&basis>=0&&!row[basis]?.trim())issues.push('Preisbasis fehlt');
+  if(ean>=0&&row[ean]?.trim()&&!/^\d{8}$|^\d{12,14}$/.test(row[ean].trim()))issues.push('EAN/GTIN-Format prüfen');
+  if(row.length!==keys.length)issues.push('Spaltenanzahl abweichend');
+  return {i,issues};
+ });
+ return findings;
+}
+function renderScannerPreview(data){
+ const box=document.getElementById('list-scanner-preview');box.replaceChildren();box.classList.remove('hidden');
+ const findings=scannerCheckRows(data), flagged=findings.filter(x=>x.issues.length);
+ const top=scannerEl('div','flex flex-wrap items-start justify-between gap-4');
+ const intro=scannerEl('div');intro.append(scannerEl('p','text-[11px] font-semibold tracking-widest uppercase text-[#24a1d6]','DATEI GELESEN'),scannerEl('h3','mt-1 text-lg font-semibold text-slate-900','Vorschau der Bestandsliste'),scannerEl('p','mt-1 text-xs text-slate-500',data.rows.length.toLocaleString('de-DE')+' Positionen · '+data.headers.length+' Spalten · '+flagged.length+' Zeilen mit Hinweisen'));
+ const btn=scannerEl('button','rounded-xl bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 hover:bg-slate-700','Liste vorprüfen');btn.type='button';btn.addEventListener('click',()=>renderScannerCheck(data,findings));top.append(intro,btn);box.append(top);
+ const controls=scannerEl('div','mt-5 flex flex-wrap gap-3 items-center');
+ const search=scannerEl('input','min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#24a1d6]');search.placeholder='Positionen durchsuchen …';search.setAttribute('aria-label','CSV-Positionen durchsuchen');
+ const counter=scannerEl('span','text-xs text-slate-400');controls.append(search,counter);box.append(controls);
+ const scroll=scannerEl('div','mt-3 overflow-auto rounded-xl border border-slate-200 max-h-[430px]');const table=scannerEl('table','w-full text-left text-xs whitespace-nowrap');const thead=scannerEl('thead','sticky top-0 bg-slate-50 text-slate-500');const hr=scannerEl('tr');hr.append(scannerEl('th','px-3 py-3 font-semibold','#'));data.headers.forEach(h=>hr.append(scannerEl('th','px-3 py-3 font-semibold',h)));thead.append(hr);table.append(thead);const tbody=scannerEl('tbody','divide-y divide-slate-100');table.append(tbody);scroll.append(table);box.append(scroll);
+ const hint=scannerEl('p','mt-3 text-[11px] text-slate-400','Vorschau auf 100 Positionen begrenzt. Alle Positionen werden bei der Vorprüfung berücksichtigt.');box.append(hint);
+ const render=()=>{const query=search.value.toLocaleLowerCase('de');const matches=data.rows.map((r,i)=>({r,i})).filter(x=>x.r.some(v=>v.toLocaleLowerCase('de').includes(query)));counter.textContent=matches.length+' Treffer';tbody.replaceChildren();for(const {r,i} of matches.slice(0,100)){const tr=scannerEl('tr','hover:bg-cyan-50/40');tr.append(scannerEl('td','px-3 py-2.5 text-slate-400',i+1));r.forEach(v=>{const td=scannerEl('td','px-3 py-2.5 text-slate-700 max-w-[260px] truncate',v||'—');td.title=v;tr.append(td);});tbody.append(tr);}};
+ search.addEventListener('input',render);render();
+ const results=scannerEl('div','hidden mt-5 rounded-xl border border-cyan-100 bg-cyan-50/50 p-5');results.id='list-scanner-check-results';box.append(results);
+}
+function renderScannerCheck(data,findings){
+ const target=document.getElementById('list-scanner-check-results');target.classList.remove('hidden');target.replaceChildren();
+ const issues=findings.filter(x=>x.issues.length);const heading=scannerEl('h4','font-semibold text-slate-900','Technische Vorprüfung abgeschlossen');target.append(heading);
+ target.append(scannerEl('p','mt-2 text-sm text-slate-600',data.rows.length+' Positionen eingelesen · '+(data.rows.length-issues.length)+' ohne Format-Hinweis · '+issues.length+' mit Prüfhinweis.'));
+ if(issues.length){const ul=scannerEl('ul','mt-3 space-y-1 text-xs text-amber-800');for(const x of issues.slice(0,15)){ul.append(scannerEl('li','', 'Zeile '+(x.i+2)+': '+x.issues.join(' · ')));}target.append(ul);if(issues.length>15)target.append(scannerEl('p','mt-2 text-xs text-slate-500','Weitere '+(issues.length-15)+' Hinweise nicht angezeigt.'));}
+ target.append(scannerEl('p','mt-4 text-xs text-cyan-900','Dies ist eine lokale Daten- und Plausibilitätsprüfung – noch keine KI-Recherche, Marktpreisprüfung oder A/B/C/X-Bewertung. Es wurden keine Deals gespeichert.'));
+ target.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 async function handleListScannerFile(file){
-  if(!file)return;
-  const result=document.getElementById('list-scanner-result');result.classList.remove('hidden');result.replaceChildren();
-  const heading=document.createElement('h3');heading.className='font-semibold text-slate-900';heading.textContent=file.name;result.append(heading);
-  const detail=document.createElement('p');detail.className='mt-2 text-sm text-slate-500';result.append(detail);
-  if(!/\.csv$/i.test(file.name)){detail.textContent='Bitte eine CSV-Datei auswählen.';return;}
-  if(file.size>10*1024*1024){detail.textContent='Die Datei ist größer als 10 MB.';return;}
-  try{const raw=await file.text();const parsed=countCsvRows(raw);if(!parsed.valid)throw Error('CSV enthält nicht geschlossene Anführungszeichen.');
-    detail.textContent=(file.size/1024).toLocaleString('de-DE',{maximumFractionDigits:1})+' KB · '+parsed.rows.toLocaleString('de-DE')+' Datenzeilen erkannt';
-    const note=document.createElement('p');note.className='mt-3 text-xs text-cyan-800';note.textContent='Datei lokal eingelesen. Noch keine Speicherung, Analyse oder Übernahme in Deals.';result.append(note);
-  }catch(e){detail.textContent='Datei konnte nicht eingelesen werden: '+(e.message||'Unbekannter Fehler');}
+ if(!file)return;
+ const result=document.getElementById('list-scanner-result');result.classList.remove('hidden');result.replaceChildren();
+ const preview=document.getElementById('list-scanner-preview');preview?.classList.add('hidden');preview?.replaceChildren();scannerData=null;
+ const heading=scannerEl('h3','font-semibold text-slate-900',file.name);result.append(heading);
+ const detail=scannerEl('p','mt-2 text-sm text-slate-500');result.append(detail);
+ if(!/\.csv$/i.test(file.name)){detail.textContent='Bitte eine CSV-Datei auswählen.';return;}
+ if(file.size>10*1024*1024){detail.textContent='Die Datei ist größer als 10 MB.';return;}
+ try{const raw=await file.text();const data=parseScannerCsv(raw);scannerData=data;
+  detail.textContent=(file.size/1024).toLocaleString('de-DE',{maximumFractionDigits:1})+' KB · '+data.rows.length.toLocaleString('de-DE')+' Datenzeilen erkannt';
+  result.append(scannerEl('p','mt-3 text-xs text-cyan-800','Datei lokal eingelesen · Keine Speicherung in der Datenbank.'));
+  renderScannerPreview(data);
+ }catch(e){detail.textContent='Datei konnte nicht eingelesen werden: '+(e.message||'Unbekannter Fehler');}
 }
 document.addEventListener('DOMContentLoaded',()=>{
  const zone=document.getElementById('list-scanner-dropzone'),input=document.getElementById('list-scanner-input');
