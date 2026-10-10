@@ -409,6 +409,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     article.deal-workspace:not(.deal-compact) .deal-decision-overview,
     article.deal-workspace:not(.deal-compact) .deal-b2c-market{display:none!important}
 
+    /* Monochrome Werkzeug-Icons statt Nummern – ruhige, einheitliche Linienoptik. */
+    .deal-workspace .deal-accordion-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;color:#1f2937!important}
+    .deal-workspace .deal-accordion-icon svg{width:19px;height:19px;display:block}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
@@ -1919,11 +1923,19 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           details.dataset.accordionSection=key;
           details.dataset.dealId=id;
           details.open=saved.has(key);
-          const number=btn.querySelector('.deal-division-index')?.textContent?.slice(0,2)||'';
+          const toolIcons={
+            radar:'<path d="M3 7h18v13H3z"/><path d="M3 11h18M8 3v8M16 3v8"/><path d="M7 16h4"/>',
+            cipher:'<path d="M12 3 4 7v5c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7z"/><path d="m9 12 2 2 4-4"/>',
+            oracle:'<path d="M4 19V5M4 19h17"/><path d="m7 15 4-4 3 2 5-7"/><path d="M16 6h3v3"/>',
+            quantum:'<path d="M4 19V5M4 19h17"/><path d="m7 15 4-4 3 2 5-7"/>',
+            verdict:'<path d="M4 19V5M4 19h17"/><path d="m7 15 4-4 3 2 5-7"/>',
+            product:'<path d="m12 2 9 5v10l-9 5-9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+            buyer:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>'
+          };
           const title=btn.querySelector('strong')?.textContent||key;
           const subtitle=btn.querySelector('small')?.textContent||'';
           const summary=document.createElement('summary');
-          const index=document.createElement('span');index.className='deal-accordion-number';index.textContent=number;
+          const index=document.createElement('span');index.className='deal-accordion-number deal-accordion-icon';index.setAttribute('aria-hidden','true');index.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(toolIcons[key]||toolIcons.oracle)+'</svg>';
           const label=document.createElement('span');label.className='deal-accordion-title';
           const strong=document.createElement('strong');strong.textContent=title;
           const small=document.createElement('small');small.textContent=subtitle;
