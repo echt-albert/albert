@@ -1567,7 +1567,24 @@
         return;
       }
       const expected = qty * rate / 100 * cost;
-      result.textContent = 'Erwartete Retourenkosten für den Posten: ' + expected.toLocaleString('de-DE',{style:'currency',currency:'EUR'}) + ' · Annahme, noch nicht in QUANTUM-Vollkosten übernommen.';
+      const money = value => value.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+      const perUnit = rate / 100 * cost;
+      const report = deal.market_deep_dive;
+      const verified = (Array.isArray(report?.shopping_results) ? report.shopping_results : [])
+        .filter(row => safeUrl(row.url) && row.total_price_verified === true && Number.isFinite(Number(row.total_price)) && Number(row.total_price)>0)
+        .map(row => Number(row.total_price));
+      const lowest = verified.length ? Math.min(...verified) : null;
+      const residual = lowest === null ? null : lowest * 0.8 * 0.8 - perUnit;
+      result.replaceChildren();
+      const summary = document.createElement('p');
+      summary.textContent = 'Retourenbelastung: ' + money(perUnit) + ' je Stück · ' + money(expected) + ' für den Posten.';
+      result.appendChild(summary);
+      const detail = document.createElement('p');
+      detail.className = 'mt-1 text-slate-500';
+      detail.textContent = residual === null
+        ? 'Rest nach Marketing und Retouren nicht berechenbar: verifizierter B2C-Gesamtpreis fehlt.'
+        : 'Rest nach 20 % Marketing und erwarteten Retourenkosten: ' + money(residual) + ' je Stück, vor EK, Versand, Gebühren und weiteren Kosten. Kein Gewinn/MAX-EK.';
+      result.appendChild(detail);
     }
     document.getElementById('deals-container').addEventListener('toggle', event => {
       const section = event.target.closest('[data-return-scenario]');
