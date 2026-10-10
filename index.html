@@ -2756,7 +2756,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if(!isDealExpanded(deal.id, activeDealView)){
           const id=escapeHtml(String(deal.id||''));
           const source=safeUrl(deal.offer_url);
-          const bidRaw=deal.scanner_test_values?.startpreis_gesamt_eur;
+          const bidRaw=deal.scanner_test_values?.startpreis_gesamt_eur ?? (String(deal.decision_reason||'').match(/Startgebot:\s*([\d.,]+)\s*EUR/i)||[])[1];
           const bid=bidRaw==null||String(bidRaw).trim()===''?null:Number(String(bidRaw).replace(',','.'));
           const bidKnown=bid!==null&&Number.isFinite(bid)&&bid>=0;
           const price=bidKnown?bid:Number(deal.purchase_price);
