@@ -2874,18 +2874,6 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <div class="deal-fact"><span class="deal-fact-label">Anbieter</span><strong class="deal-fact-value">${escapeHtml(deal.supplier_name || 'Unbekannt')}</strong>${offerUrl ? '<a class="deal-fact-hint text-amber-800 underline" href="'+offerUrl+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>' : ''}</div>
             </div>
 
-            <div class="buyer-open-checks" aria-label="Offene Prüfpunkte">
-              <strong>Vor Entscheidung prüfen:</strong>
-              ${[
-                ...(!Number.isSafeInteger(Number(deal.quantity)) || Number(deal.quantity)<=0 ? [['radar','Menge fehlt · X']] : []),
-                ...(!hasPurchasePrice ? [['radar','EK fehlt']] : []),
-                ...(!deal.ean_gtin && !deal.mpn ? [['cipher','Produktkennung fehlt']] : []),
-                ...(!deal.cipher_research?.checked_at ? [['cipher','Identität offen']] : []),
-                ...(b2cLowest==null ? [['oracle','B2C-Gesamtpreis offen']] : []),
-                ...(!deal.quantum_calculation?.checked_at ? [['quantum','Kalkulation offen']] : []),
-                ...(!deal.human_verdict?.verdict_grade ? [['verdict','Entscheidung offen']] : [])
-              ].map(([key,label])=>'<button type="button" class="px-2 py-1 border rounded-md bg-white hover:bg-slate-100" data-deal-division="'+key+'" data-deal-id="'+dealId+'">'+escapeHtml(label)+' ↗</button>').join('') || '<span>Standardprüfungen vollständig · weitere Risiken separat prüfen</span>'}
-            </div>
             <div class="buyer-risk-strip" aria-label="Risikostatus des Postens">
               <strong>Risiko-Check</strong>
               <span>Identität: ${deal.cipher_research?.checked_at ? 'Recherchehinweise · unbestätigt' : 'Offen'}</span>
