@@ -1585,6 +1585,33 @@
         ? 'Rest nach Marketing und Retouren nicht berechenbar: verifizierter B2C-Gesamtpreis fehlt.'
         : 'Rest nach 20 % Marketing und erwarteten Retourenkosten: ' + money(residual) + ' je Stück, vor EK, Versand, Gebühren und weiteren Kosten. Kein Gewinn/MAX-EK.';
       result.appendChild(detail);
+      if (lowest !== null) {
+        const title = document.createElement('p');
+        title.className = 'mt-3 font-semibold text-slate-700';
+        title.textContent = 'Drei Retouren-Stressszenarien · keine Absatzprognose';
+        result.appendChild(title);
+        const cases = [
+          ['Günstig', 0.75],
+          ['Basis · Eingabe', 1],
+          ['Belastet', 1.5]
+        ];
+        for (const [label, multiplier] of cases) {
+          const scenarioRate = Math.min(100, rate * multiplier);
+          const scenarioCost = scenarioRate / 100 * cost;
+          const row = document.createElement('p');
+          row.className = 'mt-1 flex justify-between gap-2';
+          const name = document.createElement('span');
+          name.textContent = label + ' · ' + scenarioRate.toLocaleString('de-DE',{maximumFractionDigits:2}) + ' % Retouren';
+          const value = document.createElement('strong');
+          value.textContent = money(lowest * 0.64 - scenarioCost) + ' / Stk.';
+          row.append(name,value);
+          result.appendChild(row);
+        }
+        const note = document.createElement('p');
+        note.className = 'mt-2 text-slate-500';
+        note.textContent = 'Reine Sensitivität: 75 % / 100 % / 150 % der eingegebenen Retourenquote (max. 100 %); Kosten pro Retoure unverändert. Rest jeweils nach 20 % Preisabschlag und 20 % Marketing, vor EK, Versand, Gebühren und weiteren Kosten. Keine Vollkostenrechnung, kein MAX-EK.';
+        result.appendChild(note);
+      }
     }
     document.getElementById('deals-container').addEventListener('toggle', event => {
       const section = event.target.closest('[data-return-scenario]');
