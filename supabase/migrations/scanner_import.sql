@@ -1,7 +1,7 @@
 -- Scanner import: stable source identity and atomic insert into existing deals.
 -- Execute after review; no automatic analysis, ratings or market prices.
 create sequence if not exists public.scanner_discovery_id_seq;
-select setval('public.scanner_discovery_id_seq', greatest(coalesce((select max(id) from public.discoveries),0)+1000,1000000000),false);
+select setval('public.scanner_discovery_id_seq', greatest(coalesce((select max(id) from public.discoveries),0)+1000000,1000000000),false);
 create table if not exists public.scanner_import_items(
   id bigint generated always as identity primary key,
   source_key text not null unique,
