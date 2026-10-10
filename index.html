@@ -266,7 +266,26 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 .albert-account-toggle{font-size:11px;color:#64748b;text-decoration:underline;text-underline-offset:3px;margin-top:14px}
 .albert-discovery-reason{background:#f8fafc;border-left:3px solid #d6a54d;padding:10px 12px;border-radius:0 10px 10px 0}
 @media(max-width:767px){body.albert-chat-open .albert-right-rail{right:12px;bottom:75px}}
-</style>
+
+    /* Dealakte: Werkzeuge zuerst, nur ein aktiver Arbeitsbereich */
+    .deal-workspace .deal-division-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:18px 0 20px}
+    .deal-workspace .deal-division-link{min-height:102px;padding:16px;border:1.5px solid #cbd5e1;border-radius:14px;background:#f8fafc;box-shadow:0 2px 5px rgba(15,23,42,.04);justify-content:center;gap:7px}
+    .deal-workspace .deal-division-link strong{font-size:15px;color:#0f172a}
+    .deal-workspace .deal-division-link small{font-size:11px;color:#64748b}
+    .deal-workspace .deal-division-link:hover{border-color:#3b82f6;background:#eff6ff}
+    .deal-workspace .deal-division-link[aria-current="true"]{border:2px solid #2563eb;background:#eff6ff;box-shadow:0 0 0 2px rgba(37,99,235,.10)}
+    .deal-workspace .deal-division-link[aria-current="true"] strong{color:#1d4ed8}
+    .deal-workspace .deal-divisions{display:block}
+    .deal-workspace .deal-divisions>[data-division-section]{display:none!important}
+    .deal-workspace .deal-divisions>[data-division-section].deal-workspace-active{display:flex!important}
+    .deal-workspace .deal-divisions>.deal-workspace-active{margin-top:8px}
+    .deal-workspace .deal-status-guidance,.deal-workspace .buyer-risk-strip,.deal-workspace .deal-compact-summary{display:none!important}
+    .deal-workspace .deal-decision-overview{display:block!important;margin-bottom:12px}
+    .deal-workspace .deal-overview-next{display:none}
+    .deal-workspace .deal-overview-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+    @media(max-width:800px){.deal-workspace .deal-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+  </style>
 </head>
 
 <body class="bg-[#f7f7f9] text-[#1d1d1f] min-h-screen selection:bg-amber-100 selection:text-amber-900 flex">
@@ -1723,6 +1742,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       if(!card)return;
       if(card.classList.contains('deal-compact'))toggleDealCard(id);
       card.querySelectorAll('.deal-division-link').forEach(b=>b.setAttribute('aria-current',String(b===button)));
+      card.querySelectorAll('[data-division-section]').forEach(el=>el.classList.toggle('deal-workspace-active',el.dataset.divisionSection===section));
       const target=card.querySelector('[data-division-section="'+section+'"]');
       if(target){target.scrollIntoView({behavior:'smooth',block:'start'});target.focus({preventScroll:true});}
     });
@@ -2372,7 +2392,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
         return `
 
-          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'ring-2 ring-blue-500 border-blue-500 '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-blue-500 border-blue-500 '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <div class="mb-3 flex justify-end"><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
             <!-- DEAL HEADER -->
 
@@ -2433,8 +2453,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
               <span>Compliance: Nicht geprüft</span>
               <button type="button" data-deal-division="verdict" data-deal-id="${dealId}">Entscheidung prüfen ↗</button>
             </div>
-            <!-- SIEBEN ABTEILUNGEN: in jeder Ansicht direkt erreichbar -->
-            <nav class="deal-division-nav" aria-label="Abteilungen der Deal-Akte">
+            <!-- WERKZEUGE: jeweils ein aktiver Arbeitsbereich -->
+            <nav class="deal-division-nav" aria-label="Albert Werkzeuge">
               ${[
                 ['radar','01','Einkauf','Bezugsquelle',Boolean(deal.offer_url)],
                 ['cipher','02','Identität','Produktprüfung',Boolean(deal.cipher_research?.checked_at)],
