@@ -687,6 +687,30 @@ function renderScannerPreview(data){
  const hint=scannerEl('p','mt-3 text-[11px] text-slate-400','Vorschau auf 100 Positionen begrenzt. Alle Positionen werden bei der Vorprüfung berücksichtigt.');box.append(hint);
  const render=()=>{const query=search.value.toLocaleLowerCase('de');const matches=data.rows.map((r,i)=>({r,i})).filter(x=>x.r.some(v=>v.toLocaleLowerCase('de').includes(query)));counter.textContent=matches.length+' Treffer';tbody.replaceChildren();for(const {r,i} of matches.slice(0,100)){const tr=scannerEl('tr','hover:bg-cyan-50/40');tr.append(scannerEl('td','px-3 py-2.5 text-slate-400',i+1));r.forEach(v=>{const td=scannerEl('td','px-3 py-2.5 text-slate-700 max-w-[260px] truncate',v||'—');td.title=v;tr.append(td);});tbody.append(tr);}};
  search.addEventListener('input',render);render();
+ const importer=scannerEl('div','mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4');
+ const supplier=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm');supplier.placeholder='Quelle / Insolvenzverwalter (optional)';
+ const importBtn=scannerEl('button','mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white','Als Deals in ☆ Unbewertet übernehmen');importBtn.type='button';
+ const progress=scannerEl('p','mt-2 text-xs text-slate-600');
+ importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importBtn,progress);box.append(importer);
+ importBtn.addEventListener('click',async()=>{
+  const find=(...names)=>data.headers.findIndex(h=>names.includes(h.toLowerCase().trim().replace(/\\s+/g,'_')));
+  const idx={name:find('produktname','artikelbezeichnung','bezeichnung','artikel','produkt','name'),brand:find('marke','brand'),ean:find('ean','ean_gtin','gtin'),mpn:find('mpn','artikelnummer','herstellerartikelnummer'),qty:find('menge','anzahl','verfuegbare_menge','stückzahl'),price:find('ek','ek_netto','preis_netto_eur','einkaufspreis'),basis:find('preisbasis','preiseinheit')};
+  if(idx.name<0){progress.textContent='Keine Produktspalte erkannt. Bitte CSV-Spaltenüberschriften prüfen.';return;}
+  const rows=data.rows.map((r,i)=>({line:i+2,product_name:(r[idx.name]||'').trim(),brand:idx.brand<0?'':r[idx.brand],ean_gtin:idx.ean<0?'':r[idx.ean],mpn:idx.mpn<0?'':r[idx.mpn],quantity:idx.qty<0?'':r[idx.qty],purchase_price:idx.price<0?'':r[idx.price],price_basis:idx.basis<0?'':r[idx.basis]}));
+  if(rows.some(x=>!x.product_name)){progress.textContent='Mindestens eine Position ohne Produktnamen. Bitte Liste korrigieren.';return;}
+  if(rows.length>1000){progress.textContent='Maximal 1.000 Positionen pro Import.';return;}
+  if(!confirm(rows.length+' Artikel als unbewertete Deals übernehmen? Keine automatische Analyse.'))return;
+  importBtn.disabled=true;progress.textContent='Import läuft …';
+  try{
+   const {data:session}=await supabaseClient.auth.getSession();
+   if(!session?.session?.access_token)throw Error('Bitte zuerst als Einkäufer anmelden.');
+   const {data:result,error}=await supabaseClient.functions.invoke('albert-scanner-import',{body:{filename:scannerData?.filename||'Bestandsliste.csv',supplier_name:supplier.value.trim(),rows}});
+   if(error||!result?.success)throw Error(result?.error||error?.message||'Import fehlgeschlagen');
+   progress.textContent=result.created+' Deals übernommen · '+result.skipped+' bereits vorhanden. Öffne ☆ Unbewertet …';
+   activeDealView='UNRATED';cachedDealSnapshot=null;closeListScanner();await fetchDeals();
+  }catch(e){progress.textContent='Import nicht abgeschlossen: '+(e.message||String(e));}
+  finally{importBtn.disabled=false;}
+ });
  const results=scannerEl('div','hidden mt-5 rounded-xl border border-cyan-100 bg-cyan-50/50 p-5');results.id='list-scanner-check-results';box.append(results);
 }
 function renderScannerCheck(data,findings){
@@ -705,7 +729,7 @@ async function handleListScannerFile(file){
  const detail=scannerEl('p','mt-2 text-sm text-slate-500');result.append(detail);
  if(!/\.csv$/i.test(file.name)){detail.textContent='Bitte eine CSV-Datei auswählen.';return;}
  if(file.size>10*1024*1024){detail.textContent='Die Datei ist größer als 10 MB.';return;}
- try{const raw=await file.text();const data=parseScannerCsv(raw);scannerData=data;
+ try{const raw=await file.text();const data=parseScannerCsv(raw);scannerData=data;scannerData.filename=file.name;
   detail.textContent=(file.size/1024).toLocaleString('de-DE',{maximumFractionDigits:1})+' KB · '+data.rows.length.toLocaleString('de-DE')+' Datenzeilen erkannt';
   result.append(scannerEl('p','mt-3 text-xs text-cyan-800','Datei lokal eingelesen · Keine Speicherung in der Datenbank.'));
   renderScannerPreview(data);
