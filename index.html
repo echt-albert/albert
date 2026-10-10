@@ -356,6 +356,16 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     /* Neue Sofort-Jagd-Funde auf einen Blick sichtbar machen. */
     .deal-sofort-highlight{border:2px solid #24a1d6!important;box-shadow:0 0 0 2px rgba(36,161,214,.07),0 2px 8px rgba(15,23,42,.05)}
     .deal-sofort-highlight:hover{box-shadow:0 0 0 3px rgba(36,161,214,.12),0 6px 16px rgba(15,23,42,.08)}
+
+/* Professional navigation: restrained controls, consistent active states */
+#list-scanner-nav,.deal-view{border-radius:8px!important;min-height:40px;transition:background-color .14s,color .14s,border-color .14s!important}
+#list-scanner-nav{margin-top:0!important;margin-bottom:14px!important;font-weight:600!important}
+#list-scanner-nav:hover,.deal-view:hover{background:#f1f5f9!important;color:#0f172a!important}
+#list-scanner-nav[aria-expanded="true"]{background:#eaf4f9!important;color:#075985!important;box-shadow:inset 3px 0 0 #24a1d6}
+#deal-navigation .deal-view{font-weight:500;letter-spacing:0}
+#deal-navigation .deal-view:focus-visible,#list-scanner-nav:focus-visible{outline:2px solid #24a1d6;outline-offset:2px}
+#list-scanner-dropzone{border-radius:12px!important;border-width:1px!important}
+#list-scanner-page button,#list-scanner-dropzone .rounded-full{border-radius:8px!important}
 </style>
 </head>
 
@@ -385,7 +395,6 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
       </a>
 
-      <button type="button" id="source-radar-nav" onclick="toggleSourceRadar()" aria-pressed="false" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
       <button type="button" id="list-scanner-nav" onclick="openListScanner()" class="w-full mt-2 mb-3 flex items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-700 hover:bg-cyan-50 hover:text-cyan-800 transition-colors" aria-controls="list-scanner-page" aria-expanded="false"><svg class="w-4 h-4 text-[#24a1d6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8z"/><path d="M14 3v6h7M8 13h8M8 17h8"/></svg><span>Scanner</span></button>
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Meine Deal-Bewertungen"><p class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Meine Deal-Ablage</p>
         <button type="button" data-view="UNRATED" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>☆ Unbewertet</span><span data-count="UNRATED" class="font-mono text-[11px]">–</span></button>
