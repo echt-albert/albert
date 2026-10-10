@@ -845,13 +845,11 @@
       try {
         const response=await fetch(SUPABASE_URL+'/functions/v1/albert-cipher',{
           method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
-          body:JSON.stringify({product:deal}),signal:AbortSignal.timeout(35000)
+          body:JSON.stringify({product:deal,deal_id:Number(id)}),signal:AbortSignal.timeout(35000)
         });
         const data=await response.json();
         if(!response.ok||!data.success)throw Error(data.error||'CIPHER-Recherche fehlgeschlagen.');
-        const {error}=await supabaseClient.from('discoveries').update({cipher_research:data.report}).eq('id',dealId);
-        if(error)throw error;
-        finishAlbertActivity('cipher-'+id,'CIPHER',(data.report?.results?.length||0)+' Recherchehinweise gespeichert. Identität und Konformität noch nicht verifiziert.',false);
+        // albert-cipher speichert den Bericht serverseitig; kein anonymer Tabellenzugriff.\n        finishAlbertActivity('cipher-'+id,'CIPHER',(data.report?.results?.length||0)+' Recherchehinweise gespeichert. Identität und Konformität noch nicht verifiziert.',false);
       }catch(e){
         finishAlbertActivity('cipher-'+id,'CIPHER',e.message||String(e),true);
         showStatus('CIPHER: '+(e.message||e),true);
