@@ -348,6 +348,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-toolbar-dropdown button:hover{background:#f8fafc;color:#0f172a}
     .deal-inline-actions :is(button,summary):focus-visible{outline:2px solid #24a1d6;outline-offset:2px}
     @media(max-width:700px){.deal-inline-actions{flex-wrap:wrap;justify-content:flex-end}.deal-rating-with-akte{flex-wrap:wrap}}
+
+    .deal-header-spuersinn{max-width:fit-content}
+    .deal-header-spuersinn [data-spuersinn-kind],.deal-header-spuersinn [data-spuersinn-clear]{padding:7px 10px;font-size:11px;white-space:nowrap}
+    @media(max-width:700px){.deal-header-spuersinn{max-width:100%}.deal-header-spuersinn [data-spuersinn-kind],.deal-header-spuersinn [data-spuersinn-clear]{white-space:normal}}
 </style>
 </head>
 
@@ -2363,9 +2367,14 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         const info = discoveryNotes.get(String(deal.id));
         if (!info) return '';
         const filtered = activeSpuersinnFilter && activeSpuersinnFilter.kind === info.kind && activeSpuersinnFilter.value === info.value;
+        const match = info.note.match(/(\d+) weitere Funde/);
+        const compact = match
+          ? '🔎 Spürsinn · '+match[1]+' weitere Funde'
+          : info.kind === 'platform' ? '🔎 Spürsinn · Neue Plattform' : '🧠 Spürsinn · Anbieter bekannt';
+
         return filtered
-          ? '<button type="button" data-spuersinn-clear class="mt-2 block w-full rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:bg-cyan-100/70" title="Spürsinn-Filter entfernen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Filter entfernen ×</span></button>'
-          : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
+          ? '<button type="button" data-spuersinn-clear class="mt-2 block w-full rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:bg-cyan-100/70" title="'+escapeHtml(info.note)+' · Spürsinn-Filter entfernen">'+escapeHtml(compact)+' <span class="font-semibold text-cyan-700">Filter entfernen ×</span></button>'
+          : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="'+escapeHtml(info.note)+' · Alle passenden Deals anzeigen">'+escapeHtml(compact)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
       };
       learningDealIndex = deals || [];
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
