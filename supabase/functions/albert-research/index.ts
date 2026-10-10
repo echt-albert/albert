@@ -1,181 +1,135 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { GoogleGenAI } from "https://esm.sh/@google/genai"
-import { createClient } from "npm:@supabase/supabase-js@2"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { GoogleGenAI } from "https://esm.sh/@google/genai";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
-async function checkUrl(url: string): Promise<boolean> {
+type Candidate = Record<string, unknown>;
+const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { "content-type": "application/json", "access-control-allow-origin": "*",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info" }
+});
+const text = (v: unknown) => typeof v === "string" ? v.trim() : "";
+const normalize = (v: unknown) => text(v).toLowerCase().normalize("NFKD")
+  .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+function validOfferUrl(value: unknown): string | null {
   try {
-    const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-    return res.ok;
-  } catch {
-    return false;
-  }
+    const u = new URL(text(value));
+    if (u.protocol !== "https:" || !u.hostname.includes(".") || u.username || u.password) return null;
+    if (["localhost", "127.0.0.1"].includes(u.hostname)) return null;
+    u.hash = "";
+    return u.toString();
+  } catch { return null; }
 }
-
-serve(async (req) => {
-  let supabase;
-  let runId = null;
-
+function candidatesFrom(raw: string): Candidate[] {
+  const cleaned = raw.replace(/```(?:json)?/gi, "").trim();
+  let value: any;
+  try { value = JSON.parse(cleaned); }
+  catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("RADAR: Keine strukturierte Gemini-Antwort.");
+    value = JSON.parse(match[0]);
+  }
+  const arr = Array.isArray(value) ? value : Array.isArray(value?.candidates) ? value.candidates
+    : value?.offer_url ? [value] : [];
+  return arr.filter(x => x && typeof x === "object").slice(0, 12);
+}
+async function urlCheck(url: string): Promise<"ok" | "unverified" | "rejected"> {
+  // HEAD is often blocked by real shops. GET is a fallback, not proof of stock.
+  for (const method of ["HEAD", "GET"] as const) {
+    try {
+      const res = await fetch(url, { method, redirect: "follow", signal: AbortSignal.timeout(6500),
+        headers: method === "GET" ? { Range: "bytes=0-1024" } : {} });
+      await res.body?.cancel();
+      if (res.ok) return "ok";
+      if ([401, 403, 405, 429].includes(res.status)) continue;
+      if (res.status === 404 || res.status === 410) return "rejected";
+    } catch { /* next method */ }
+  }
+  return "unverified"; // Not a reliable reason to discard a potentially real offer.
+}
+serve(async req => {
+  if (req.method === "OPTIONS") return reply({});
+  if (req.method !== "POST") return reply({ success: false, error: "POST only" }, 405);
+  const key = Deno.env.get("GEMINI_API_KEY");
+  const url = Deno.env.get("SUPABASE_URL");
+  const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!key || !url || !secret) return reply({ success: false, error: "Research configuration missing" }, 500);
+  // Only server-to-server invocations may trigger billable research.
+  const auth = req.headers.get("authorization") || "";
+  if (auth !== "Bearer " + secret && req.headers.get("apikey") !== secret)
+    return reply({ success: false, error: "Unauthorized" }, 401);
+  const db = createClient(url, secret, { auth: { persistSession: false } });
+  let runId: string | number | null = null;
+  const stats = { candidates: 0, invalid: 0, dead: 0, duplicates: 0,
+    alternative: 0, saved: 0, urlUnverified: 0, errors: 0 };
   try {
-    console.log("1. Starte Albert Research Kortex...");
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!apiKey) throw new Error("GEMINI_API_KEY ist nicht hinterlegt.");
-    if (!supabaseUrl || !supabaseServiceKey) throw new Error("Supabase System-Variablen fehlen.");
-
-    supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-
-    const { data: runData, error: runError } = await supabase
-      .from("research_runs")
-      .insert([{ status: "running" }])
-      .select("id")
-      .single();
-
-    if (runError) {
-      console.error("Konnte research_run nicht anlegen:", runError);
-    } else {
-      runId = runData?.id;
-      console.log("Research Run ID erstellt:", runId);
-    }
-
-    const { query } = await req.json().catch(() => ({ query: "" }));
-    const requestedQuery = typeof query === "string" ? query.trim().slice(0, 600) : "";
-    const ai = new GoogleGenAI({ apiKey });
-
-    console.log("2. Rufe Gemini mit Google Search Grounding auf...");
+    const payload = await req.json().catch(() => ({}));
+    const origin = payload.origin === "SOFORT" ? "SOFORT" : "PERMANENT";
+    const query = text(payload.query).slice(0, 600) || "Finde reale B2B-Restposten.";
+    const created = await db.from("research_runs").insert({ status: "running" }).select("id").single();
+    if (created.error) throw created.error;
+    runId = created.data.id;
+    const ai = new GoogleGenAI({ apiKey: key });
+    // One grounded model call; no unbounded retries or surprise cost multiplication.
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
-      contents: `Du bist ausschließlich RADAR, die Beschaffungsdivision. Suche einen realen, aktuell verfügbaren B2B-Restposten in Europa für B2C-Verkauf in Deutschland.
-      Auftrag: ${requestedQuery || "Finde einen neuen aktuellen B2B-Warenposten."}
-      Verwende Google Search. Nenne nur nachweisbare Fakten. Keine erfundenen Preise, Mengen, EANs, URLs oder Nachfrage.
-      Produktidentifikation, Marktverifikation, Wirtschaftlichkeitsrechnung und Kaufentscheidung erfolgen später durch CIPHER, ORACLE, QUANTUM und VERDICT.
-      Marktpreise dürfen als unverifizierte Recherchehinweise mitgeliefert werden, aber keine Bewertung.
-      Antworte ausschließlich mit einem JSON-Objekt mit diesen Feldern:
-      {"product_name":null,"brand":null,"ean_gtin":null,"mpn":null,"purchase_price":null,"currency":"EUR","quantity":null,"offer_url":null,"market_prices":[],"category":null}
-      Setze unbekannte Werte auf null, market_prices andernfalls auf [].
-      Der offer_url muss auf das konkrete Angebot zeigen, nicht auf eine Portalstartseite.`,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
+      contents: `Du bist RADAR, eine B2B-Beschaffungsrecherche für deutschen B2C-Handel.
+Auftrag: ${query}
+Suche mit Google Search 6 bis 10 UNTERSCHIEDLICHE, konkrete öffentlich auffindbare B2B-Angebote in Europa.
+Suche Restposten, Überbestände, Liquidationen, Sortimentswechsel und ungewöhnliche
+langweilige Kategorien (z.B. Büro-Verbrauchsmaterial, Ersatzteile, Betriebsmittel).
+Diversifiziere Quellen und Kategorien; keine erfundenen Produkte, Preise oder Links.
+Kein B2C-Marktpreis und keine Wirtschaftlichkeit erfinden. Unbekannte Werte null.
+Antworte ausschließlich als JSON-Objekt {"candidates":[{"product_name":null,
+"brand":null,"ean_gtin":null,"mpn":null,"purchase_price":null,"currency":"EUR",
+"quantity":null,"offer_url":null,"market_prices":[],"category":null,"sourcing_signal":null}]}.
+Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
+      config: { tools: [{ googleSearch: {} }] }
     });
-
-    const rawText = response?.text;
-    if (!rawText) throw new Error("Gemini hat keine Textantwort geliefert.");
-    console.log("3. Gemini Antwort erhalten:", rawText.substring(0, 100) + "...");
-
-    let dealData;
-    try {
-      const cleanText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      dealData = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(cleanText);
-    } catch (parseErr) {
-      console.error("JSON Parse Fehler:", parseErr);
-      dealData = {
-        product_name: rawText.substring(0, 255),
-        brand: null,
-        ean_gtin: null,
-        mpn: null,
-        purchase_price: null,
-        currency: "EUR",
-        quantity: null,
-        offer_url: null,
-        market_prices: [],
-        category: "Allgemein"
+    if (!response.text) throw new Error("RADAR: Leere Modellantwort.");
+    const candidates = candidatesFrom(response.text);
+    stats.candidates = candidates.length;
+    const saved: any[] = [];
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+      const offerUrl = validOfferUrl(candidate.offer_url);
+      const productName = text(candidate.product_name).slice(0, 255);
+      if (!offerUrl || !productName || seen.has(offerUrl)) { stats.invalid++; continue; }
+      seen.add(offerUrl);
+      const urlState = await urlCheck(offerUrl);
+      if (urlState === "rejected") { stats.dead++; continue; }
+      if (urlState === "unverified") stats.urlUnverified++;
+      const existing = await db.from("discoveries").select("id").eq("offer_url", offerUrl).limit(1);
+      if (existing.error) throw existing.error;
+      if (existing.data?.length) { stats.duplicates++; continue; }
+      // Do not equate the same product with a duplicate source: distinct sellers matter.
+      // Keep identity deduplication as a later, evidence-based step.
+      const purchase = typeof candidate.purchase_price === "number" && candidate.purchase_price >= 0
+        ? candidate.purchase_price : null;
+      const quantity = typeof candidate.quantity === "number" && candidate.quantity > 0
+        ? Math.floor(candidate.quantity) : null;
+      const row = {
+        product_name: productName, brand: text(candidate.brand) || null,
+        ean_gtin: text(candidate.ean_gtin) || null, mpn: text(candidate.mpn) || null,
+        purchase_price: purchase, quantity, currency: text(candidate.currency) || "EUR",
+        offer_url: offerUrl, category: text(candidate.category) || "Allgemein",
+        market_prices: [], decision_grade: "B",
+        decision_reason: "RADAR-Kandidat: Identität, EK, DE-Markt, Nachfrage und Vollkosten noch nicht verifiziert." +
+          (urlState === "unverified" ? " URL technisch nicht verifizierbar." : ""),
+        bucket: "DIVE", research_run_id: runId, hunt_origin: origin,
+        discovered_at: new Date().toISOString()
       };
+      const inserted = await db.from("discoveries").insert(row).select().single();
+      if (inserted.error) { stats.errors++; console.error("candidate insert:", inserted.error.message); continue; }
+      saved.push(inserted.data); stats.saved++;
     }
-
-    const targetUrl = typeof dealData?.offer_url === "string" ? dealData.offer_url.trim() : "";
-    if (!/^https:\/\/[^\s/]+\/\S+/i.test(targetUrl)) throw new Error("RADAR: Konkrete Angebots-URL fehlt.");
-
-    console.log("4. Prüfe URL auf Erreichbarkeit:", targetUrl);
-    const isAlive = await checkUrl(targetUrl);
-    if (!isAlive) {
-      console.log("Toter Link erkannt – überspringe Deal:", targetUrl);
-      if (runId && supabase) {
-        await supabase.from("research_runs").update({ status: "failed", finished_at: new Date().toISOString() }).eq("id", runId);
-      }
-      return new Response(
-        JSON.stringify({ success: false, status: "dead_link_skipped", url: targetUrl }),
-        { headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("5. Führe Duplikat-Check aus für URL:", targetUrl);
-    const selectRes = await supabase
-      .from("discoveries")
-      .select("id, offer_url")
-      .eq("offer_url", targetUrl)
-      .maybeSingle();
-
-    if (selectRes?.error) {
-      console.error("Supabase Select Fehler:", selectRes.error);
-      throw new Error(selectRes.error.message);
-    }
-
-    if (selectRes?.data) {
-      console.log("Deal bereits im Gedächtnis, überspringe.");
-      if (runId) {
-        await supabase.from("research_runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", runId);
-      }
-      return new Response(
-        JSON.stringify({ success: true, status: "duplicate_skipped", deal: dealData }),
-        { headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("6. Speichere neuen Deal mit 5-Kacheln-Struktur in Supabase...");
-    const insertRes = await supabase
-      .from("discoveries")
-      .insert([
-        {
-          product_name: dealData?.product_name || "Unbekanntes Produkt",
-          brand: dealData?.brand || null,
-          ean_gtin: dealData?.ean_gtin || null,
-          mpn: dealData?.mpn || null,
-          purchase_price: dealData?.purchase_price || null,
-          currency: dealData?.currency || "EUR",
-          quantity: dealData?.quantity || null,
-          offer_url: targetUrl,
-          category: dealData?.category || "Allgemein",
-          market_prices: dealData?.market_prices || [],
-          decision_grade: "B",
-          decision_reason: "RADAR-Fund: Produktidentität, deutscher Markt, Nachfrage und Vollkosten müssen durch die Spezialdivisionen geprüft werden.",
-          bucket: "DIVE",
-          research_run_id: runId,
-          discovered_at: new Date().toISOString()
-        }
-      ])
-      .select();
-
-    if (insertRes?.error) {
-      console.error("Supabase Insert Fehler:", insertRes.error);
-      throw new Error(insertRes.error.message);
-    }
-
-    if (runId) {
-      await supabase.from("research_runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", runId);
-    }
-
-    console.log("7. Deal erfolgreich gespeichert und Run abgeschlossen!");
-    return new Response(
-      JSON.stringify({ success: true, status: "new_saved", saved_deal: dealData }),
-      { headers: { "Content-Type": "application/json" } },
-    );
-
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error("FATALER FEHLER IN EDGE FUNCTION:", errorMessage);
-    
-    if (runId && supabase) {
-      await supabase.from("research_runs").update({ status: "failed", finished_at: new Date().toISOString() }).eq("id", runId);
-    }
-
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    await db.from("research_runs").update({ status: "completed",
+      finished_at: new Date().toISOString() }).eq("id", runId);
+    return reply({ success: true, status: saved.length ? "new_saved" : "no_new_deals",
+      saved_deal: saved[0] || null, saved_deals: saved, stats, run_id: runId });
+  } catch (error) {
+    if (runId != null) await db.from("research_runs").update({
+      status: "failed", finished_at: new Date().toISOString() }).eq("id", runId);
+    return reply({ success: false, error: String(error instanceof Error ? error.message : error),
+      stats, run_id: runId }, 500);
   }
-})
+});
