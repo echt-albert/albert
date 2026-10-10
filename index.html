@@ -361,6 +361,35 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace{padding-top:20px!important}
     .deal-workspace .dealakte-top-row{margin-bottom:4px!important}
 
+    /* Geöffnete Werkzeuge: gleiche Inhalte und Reihenfolge, weniger vertikaler Leerraum. */
+    .deal-workspace .deal-accordion-item[open] .deal-accordion-body{padding:7px 10px 10px!important}
+    .deal-workspace .deal-accordion-body>.deal-division-section{gap:6px!important}
+    .deal-workspace .deal-accordion-body .division-workcard,
+    .deal-workspace .deal-accordion-body .division-unified{gap:6px!important}
+    .deal-workspace .deal-accordion-body .division-unified>div:first-child>.flex.items-center.gap-2.mb-3{margin-bottom:4px!important}
+    .deal-workspace .deal-accordion-body .albert-analysis-grid{gap:8px!important;margin-top:6px!important}
+    .deal-workspace .deal-accordion-body .albert-analysis-panel{padding:9px!important}
+    .deal-workspace .deal-accordion-body .albert-analysis-verdict{margin-top:7px!important;padding:9px!important}
+    .deal-workspace .deal-accordion-body .space-y-6>:not([hidden])~:not([hidden]){margin-top:10px!important}
+    .deal-workspace .deal-accordion-body .space-y-4>:not([hidden])~:not([hidden]){margin-top:8px!important}
+    .deal-workspace .deal-accordion-body .space-y-3>:not([hidden])~:not([hidden]){margin-top:6px!important}
+    .deal-workspace .deal-accordion-body .space-y-2>:not([hidden])~:not([hidden]){margin-top:4px!important}
+    .deal-workspace .deal-accordion-body .mb-6{margin-bottom:10px!important}
+    .deal-workspace .deal-accordion-body .mb-4{margin-bottom:8px!important}
+    .deal-workspace .deal-accordion-body .mb-3{margin-bottom:5px!important}
+    .deal-workspace .deal-accordion-body .mt-6{margin-top:10px!important}
+    .deal-workspace .deal-accordion-body .mt-4{margin-top:8px!important}
+    .deal-workspace .deal-accordion-body .mt-3{margin-top:5px!important}
+    .deal-workspace .deal-accordion-body .p-6{padding:12px!important}
+    .deal-workspace .deal-accordion-body .p-5{padding:11px!important}
+    .deal-workspace .deal-accordion-body .p-4{padding:9px!important}
+    .deal-workspace .deal-accordion-body .py-4{padding-top:8px!important;padding-bottom:8px!important}
+    .deal-workspace .deal-accordion-body .py-3{padding-top:7px!important;padding-bottom:7px!important}
+    .deal-workspace .deal-accordion-body input:not([type="checkbox"]):not([type="radio"]),
+    .deal-workspace .deal-accordion-body select{min-height:30px}
+    .deal-workspace .deal-accordion-body button{min-height:30px}
+    @media(max-width:700px){.deal-workspace .deal-accordion-item[open] .deal-accordion-body{padding:7px!important}}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
