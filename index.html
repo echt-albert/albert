@@ -1288,6 +1288,45 @@
         updateAiButtons(key);
       }
     }
+    function followupKey(id,kind) { return 'albert-followup-v1:' + id + ':' + kind; }
+    function followupMessages(id,kind) {
+      try { const data=JSON.parse(localStorage.getItem(followupKey(id,kind))||'[]'); return Array.isArray(data)?data.slice(-24):[]; }
+      catch { return []; }
+    }
+    function renderFollowups(id) {
+      document.querySelectorAll('.ai-followup[data-followup-deal="'+String(id)+'"]').forEach(card=>{
+        const history=card.querySelector('.ai-followup-history');
+        history.replaceChildren();
+        followupMessages(id,card.dataset.followupKind).forEach(m=>{
+          const item=document.createElement('div');
+          item.className='rounded-lg px-3 py-2 text-xs leading-relaxed '+(m.role==='user'?'bg-slate-100 text-slate-700':'bg-white border border-slate-200 text-slate-800');
+          const label=document.createElement('strong');label.textContent=m.role==='user'?'Du: ':'Albert · Einschätzung: ';
+          const text=document.createElement('span');text.textContent=String(m.content||'');
+          item.append(label,text);history.append(item);
+        });
+      });
+    }
+    document.getElementById('deals-container').addEventListener('submit',async event=>{
+      const form=event.target.closest('.ai-followup-form');if(!form)return;
+      event.preventDefault();
+      const card=form.closest('.ai-followup');const id=card.dataset.followupDeal,kind=card.dataset.followupKind;
+      const input=form.querySelector('input'),button=form.querySelector('button');
+      const question=input.value.trim();if(question.length<3||button.disabled)return;
+      const deal=window.albertDealsById?.get(String(id))||{};
+      const context=kind==='portrait'?(portraitCache.get(String(id))||plainProductDescription(deal)||'Noch keine Analyse'):'Zielgruppenanalyse: '+(audienceCache.has(String(id))?card.parentElement.querySelector('[id^="target-audience-"]')?.textContent||'vorhanden':'Noch keine Analyse');
+      const messages=followupMessages(id,kind);
+      const prompt='Du beantwortest eine konkrete Rückfrage zu einem B2C-Produkt. Produkt: '+JSON.stringify({product_name:deal.product_name,brand:deal.brand,ean:deal.ean_gtin,mpn:deal.mpn})+'. Kontext: '+String(context).slice(0,2400)+'. Frühere Rückfragen: '+JSON.stringify(messages.slice(-6)).slice(0,3500)+'. Aktuelle Frage: '+question+'. Antworte auf Deutsch, maximal 200 Wörter. Nutze nur bereitgestellte Daten und allgemeines Modellwissen. Keine Live-Webrecherche; behaupte keine verifizierten Quellen, Preise oder Verkaufszahlen. Kennzeichne Vermutungen klar. Wenn externe Fakten nötig sind, sage ausdrücklich, dass diese nicht verifiziert wurden.';
+      button.disabled=true;button.textContent='Albert antwortet …';
+      try {
+        const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'analyse',messages:[{role:'user',content:prompt}]})});
+        const data=await response.json();if(!response.ok)throw Error(data.error||'Fehler');
+        const answer=String(data.choices?.[0]?.message?.content||'').trim();if(!answer)throw Error('Keine Antwort');
+        const updated=[...messages,{role:'user',content:question},{role:'assistant',content:answer}].slice(-24);
+        localStorage.setItem(followupKey(id,kind),JSON.stringify(updated));input.value='';renderFollowups(id);
+      }catch(e){alert('Albert konnte die Rückfrage nicht beantworten. Bitte erneut versuchen.');}
+      finally {button.disabled=false;button.textContent='Fragen ↗';}
+    });
+
     function restoreAiCards(id) {
       const key = String(id);
       const p = document.getElementById('product-portrait-' + key);
@@ -1295,6 +1334,7 @@
       if (p && portraitCache.has(key)) p.textContent = portraitCache.get(key);
       if (a && audienceCache.has(key)) a.replaceChildren(...audienceCache.get(key).map(n => n.cloneNode(true)));
       updateAiButtons(key);
+      renderFollowups(key);
     }
     function updateAiButtons(id) {
       const card = document.getElementById('deal-card-' + id);
@@ -1898,6 +1938,14 @@
                 </div>
                 <button type="button" class="ai-card-action mb-3 self-start rounded-lg border px-3 py-2 text-[11px] font-semibold text-emerald-800" data-ai-type="portrait" data-deal-id="${dealId}">Produktporträt erstellen</button>
                 <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Produktporträt noch nicht gestartet.</span>'}</p>
+                <div class="mt-4 border-t border-slate-200 pt-3 ai-followup" data-followup-kind="portrait" data-followup-deal="${dealId}">
+                  <div class="text-[10px] text-slate-500 mb-2">Rückfragen an Albert · KI-Einschätzung, keine verifizierte Webrecherche.</div>
+                  <div class="ai-followup-history space-y-2 mb-2" aria-live="polite"></div>
+                  <form class="ai-followup-form flex gap-2">
+                    <input type="text" maxlength="600" minlength="3" required class="ai-followup-input min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs" placeholder="Rückfrage an Albert …" aria-label="Rückfrage an Albert" />
+                    <button type="submit" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Fragen ↗</button>
+                  </form>
+                </div>
               </div>
 
               <!-- ZIELGRUPPEN -->
@@ -1911,6 +1959,14 @@
                   <span class="text-slate-400">Zielgruppenanalyse noch nicht gestartet.</span>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-3">KI-basierte Hypothesen · keine nachgewiesenen Käuferdaten</p>
+                <div class="mt-4 border-t border-slate-200 pt-3 ai-followup" data-followup-kind="audience" data-followup-deal="${dealId}">
+                  <div class="text-[10px] text-slate-500 mb-2">Rückfragen an Albert · KI-Einschätzung, keine verifizierte Webrecherche.</div>
+                  <div class="ai-followup-history space-y-2 mb-2" aria-live="polite"></div>
+                  <form class="ai-followup-form flex gap-2">
+                    <input type="text" maxlength="600" minlength="3" required class="ai-followup-input min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs" placeholder="Rückfrage an Albert …" aria-label="Rückfrage an Albert" />
+                    <button type="submit" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Fragen ↗</button>
+                  </form>
+                </div>
               </div>
 
             </div>
