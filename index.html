@@ -986,7 +986,7 @@
       try {
         const response=await fetch(SUPABASE_URL+'/functions/v1/albert-cipher',{
           method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
-          body:JSON.stringify({product:deal,deal_id:Number(id)}),signal:AbortSignal.timeout(35000)
+          body:JSON.stringify({product:deal,deal_id:Number(id)}),signal:AbortSignal.timeout(22000)
         });
         const data=await response.json();
         if(!response.ok||!data.success)throw Error(data.error||'CIPHER-Recherche fehlgeschlagen.');
@@ -1009,25 +1009,11 @@
     function oracleMarketCard(deal) {
       const report=oracleReport(deal);
       const offers=(Array.isArray(report?.shopping_results)?report.shopping_results:[])
-        .filter(x=>x?.merchant&&safeUrl(x.url)&&x.display_price);
-      const fmt=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
-      const validPrice=x=>Number.isFinite(Number(x))&&Number(x)>0;
-      const verified=offers.filter(x=>x.total_price_verified===true&&validPrice(x.total_price));
-      const lowest=verified.length?Math.min(...verified.map(x=>Number(x.total_price))):null;
-      const indication=report?.market_indication;
-      const numbers=offers.map(x=>x.indicative_article_price).filter(validPrice).map(Number);
-      const min=validPrice(indication?.lowest_article_price)?Number(indication.lowest_article_price):(numbers.length?Math.min(...numbers):null);
-      const max=validPrice(indication?.highest_article_price)?Number(indication.highest_article_price):(numbers.length?Math.max(...numbers):null);
-      const range=min!==null?fmt(min)+(max!==null&&max>min?' – '+fmt(max):''):'Noch nicht ermittelt';
-      const rows=offers.slice(0,3).map(x=>'<div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0"><a class="truncate text-cyan-700 hover:underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><span class="mono shrink-0 text-slate-800">'+escapeHtml(String(x.display_price))+'</span></div>').join('');
-      const status=lowest!==null?'Markt bestätigt':offers.length?'Preisindikation · Prüfung offen':report?'Recherche unvollständig':'Noch nicht recherchiert';
-      const detail=(report?.diagnostics||[]).map(x=>escapeHtml(x.engine)+': '+escapeHtml(x.hits??'–')+' Treffer'+(x.error?' · Fehler':'')).join(' · ');
-      return '<div class="mb-3"><div class="text-[10px] mono uppercase tracking-wider text-slate-400">Marktpreis</div><div class="mt-1 text-xl font-semibold leading-tight text-slate-900">'+escapeHtml(range)+'</div><div class="text-[10px] text-slate-500">'+(min!==null?'Artikelpreise · unverifiziert · ohne Versand':'Keine belastbaren Angebote gefunden')+'</div></div>'+
-        '<div class="text-[10px] mono uppercase tracking-wider text-slate-400">Marktquellen</div>'+
-        (rows?'<div class="mt-1">'+rows+'</div>':'<p class="mt-1 text-[11px] text-slate-400">Noch keine Händlerangebote verfügbar.</p>')+
-        '<div class="mt-3 flex items-center justify-between gap-2 text-[11px]"><span class="text-amber-700">'+escapeHtml(status)+'</span><span class="mono text-slate-500">'+offers.length+' Quellen</span></div>'+
-        (lowest!==null?'<div class="mt-1 text-[11px] text-emerald-700">Bestätigter Gesamtpreis: '+escapeHtml(fmt(lowest))+'</div>':'')+
-        (report?'<details class="mt-2 text-[10px] text-slate-500"><summary class="cursor-pointer select-none">Recherche-Details</summary><div class="mt-1 space-y-1"><p>'+escapeHtml(offers.length)+' Händlerhinweise · '+escapeHtml(verified.length)+' verifiziert</p>'+(detail?'<p>'+detail+'</p>':'')+(report.warnings?.length?'<p>'+escapeHtml(report.warnings.join(' · '))+'</p>':'')+(report.checked_at?'<p>'+escapeHtml(new Date(report.checked_at).toLocaleString('de-DE'))+'</p>':'')+'<p>Unverifizierte Angebote sind keine Grundlage für QUANTUM.</p></div></details>':'');
+        .filter(x=>x?.merchant&&safeUrl(x.url)&&x.display_price).slice(0,3);
+      if(!offers.length)return '<p class="text-xs text-slate-400">Noch keine Ergebnisse.</p>';
+      return '<div class="space-y-1">'+offers.map(x=>
+        '<div class="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0"><a class="min-w-0 truncate text-cyan-700 hover:underline" href="'+safeUrl(x.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(x.merchant)+' ↗</a><span class="mono shrink-0 text-slate-800">'+escapeHtml(String(x.display_price))+'</span></div>'
+      ).join('')+'</div><p class="mt-2 text-[10px] text-slate-400">KI-Preisindikation · nicht geprüft</p>';
     }
     const activeOracleSearch = new Set();
     async function searchOraclePrices(dealId) {
@@ -1055,7 +1041,7 @@
         const count=(data.report?.shopping_results||[]).filter(row=>row.merchant&&safeUrl(row.url)&&row.display_price).slice(0,3).length;
         const traces=(data.report?.diagnostics||[]).map(x=>x.engine+': '+(x.hits??'?')+' Treffer, '+(x.accepted??0)+' übernommen'+(x.error?' ('+x.error+')':'')).join(' | ');
         console.info('ORACLE Suchdiagnose',dealId,traces,data.report?.warnings||[]);
-        finishAlbertActivity('oracle-'+id,'ORACLE',count+' B2C-Händlerhinweis'+(count===1?'':'e')+(persisted?' serverseitig gespeichert.':' lokal verfügbar (Server-Speicherung offen).')+(count===0?' '+(traces||data.report?.warnings?.join('; ')||'Keine passenden Preisangaben.') : ''),false,count===0);
+        finishAlbertActivity('oracle-'+id,'ORACLE',count ? count+' Händlerpreise gefunden.' : 'Keine Händlerpreise gefunden.',false,count===0);
       }catch(e){
         finishAlbertActivity('oracle-'+id,'ORACLE',e.message||String(e),true);
         showStatus('ORACLE: '+(e.message||e),true);
@@ -2252,11 +2238,11 @@
 
                 </div>
 
-                <div><h3 class="division-title">Deutscher Absatzmarkt</h3><p class="division-subtitle">Händlerangebote und Gesamtpreise inklusive Versand</p></div>
+                <div><h3 class="division-title">Marktpreise</h3></div>
                 <div class="space-y-2 text-xs">
                   ${oracleMarketCard(deal)}
                   <button type="button" data-oracle-search="${deal.id}" ${activeOracleSearch.has(String(deal.id))?'disabled':''} class="division-action disabled:opacity-50">
-                    ${activeOracleSearch.has(String(deal.id))?'Recherche läuft':'Recherche'}
+                    ${activeOracleSearch.has(String(deal.id))?'Recherche läuft':'Recherche starten'}
                   </button>
                 </div>
 
