@@ -1949,6 +1949,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let userRatingReasons = new Map();
     let customRatingReasons = [];
     let ratingUserId = null;
+    // Bewertete Deals bleiben bis zum bewussten Abschluss sichtbar.
+    const pendingRatingFinish = new Set();
     let learningDealIndex = [];
     const ratingBusy = new Set();
     function learningTokens(deal) {
@@ -1984,12 +1986,13 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       const selected=userRatingReasons.get(String(id))||[];
       const reasons=[...new Set([...baseRatingReasons,...customRatingReasons])];
       const chips=score?'<div class="mt-2 flex flex-wrap gap-1.5">'+reasons.map(reason=>'<button type="button" data-rating-reason="'+escapeHtml(reason)+'" data-rating-id="'+escapeHtml(id)+'" aria-pressed="'+selected.includes(reason)+'" class="rounded-full border px-2 py-1 text-[11px] '+(selected.includes(reason)?'border-amber-400 bg-amber-100 text-amber-900':'border-slate-200 bg-white text-slate-600 hover:bg-amber-50')+'">'+escapeHtml(reason)+'</button>').join('')+'</div><div class="mt-2 flex flex-wrap items-center gap-2"><input type="text" maxlength="60" data-new-rating-reason="'+escapeHtml(id)+'" placeholder="Eigener Grund …" aria-label="Eigenen Bewertungsgrund hinzufügen" class="min-w-0 w-44 rounded-lg border border-slate-200 px-2 py-1.5 text-xs"><button type="button" data-add-rating-reason="'+escapeHtml(id)+'" class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs hover:bg-amber-50">+ Grund speichern</button></div>':'';
+      const finishButton=score&&pendingRatingFinish.has(String(id))?'<div class="mt-3 flex items-center gap-2"><button type="button" data-rating-finish="'+escapeHtml(id)+'" class="rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-600">✓ Fertig · Ablegen</button><span class="text-[11px] text-slate-500">Gründe sind freiwillig.</span></div>':'';
       const deal=learningDealIndex.find(d=>String(d.id)===String(id));
       const prediction=!score&&deal?predictBuyerInterest(deal):null;
       const hint=prediction?'<span class="ml-auto text-[10px] text-slate-400" title="Unverbindliche Schätzung aus ähnlichen bewerteten Deals, kein wirtschaftliches Urteil">Albert vermutet: '+escapeHtml(prediction.stars.toFixed(1))+'/5 · unsicher</span>':'';
       return '<div class="mt-3 border-t border-slate-100 pt-3" data-star-rating="'+escapeHtml(id)+'"><div class="flex items-center gap-2 flex-wrap"><span class="text-xs text-slate-500">Deine Bewertung</span><div class="flex gap-1" role="group" aria-label="Deal mit 1 bis 5 Sternen bewerten">'+
         [1,2,3,4,5].map(n=>'<button type="button" data-star-value="'+n+'" data-star-id="'+escapeHtml(id)+'" aria-label="'+n+' Sterne" aria-pressed="'+(score===n)+'" class="text-2xl leading-none hover:scale-110 transition-transform '+(n<=score?'text-amber-500':'text-slate-300')+'">★</button>').join('')+'</div>'+hint+'</div>'+
-        (score?'<p class="mt-1 text-[11px] text-slate-500">Warum? Freiwillig · Mehrfachauswahl</p>':'')+chips+'</div>';
+        (score?'<p class="mt-1 text-[11px] text-slate-500">Warum? Freiwillig · Mehrfachauswahl</p>':'')+chips+finishButton+'</div>';
     }
     function refreshRatingWidget(id) {
       const holder=document.querySelector('[data-star-rating="'+CSS.escape(String(id))+'"]');
@@ -2024,13 +2027,20 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       const star=event.target.closest('[data-star-value]');
       const reason=event.target.closest('[data-rating-reason]');
       const add=event.target.closest('[data-add-rating-reason]');
-      if(!star&&!reason&&!add)return;
+      const finish=event.target.closest('[data-rating-finish]');
+      if(!star&&!reason&&!add&&!finish)return;
       event.preventDefault();event.stopPropagation();
       if(!ratingUserId){showStatus('Bitte zuerst beim Einkäufer-Konto anmelden.',true);return;}
       if(star){
         const id=String(star.dataset.starId),old=userStarRatings.get(id);
-        userStarRatings.set(id,Number(star.dataset.starValue));refreshRatingWidget(id);
-        if(!await saveBuyerRating(id)){if(old)userStarRatings.set(id,old);else userStarRatings.delete(id);refreshRatingWidget(id);} else if(activeDealView==='UNRATED'||activeDealView.startsWith('STAR_')) { await fetchDeals(true); }
+        userStarRatings.set(id,Number(star.dataset.starValue));pendingRatingFinish.add(id);refreshRatingWidget(id);
+        if(!await saveBuyerRating(id)){if(old)userStarRatings.set(id,old);else userStarRatings.delete(id);pendingRatingFinish.delete(id);refreshRatingWidget(id);}
+      }else if(finish){
+        const id=String(finish.dataset.ratingFinish);
+        if(ratingBusy.has(id)){showStatus('Bewertung wird noch gespeichert. Bitte kurz warten.',true);return;}
+        pendingRatingFinish.delete(id);
+        if(activeDealView==='UNRATED'||activeDealView.startsWith('STAR_'))await fetchDeals(true);
+        else refreshRatingWidget(id);
       }else if(reason){
         const id=String(reason.dataset.ratingId),label=reason.dataset.ratingReason;
         const old=[...(userRatingReasons.get(id)||[])],next=new Set(old);
@@ -2132,7 +2142,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           try { return new URL(safeUrl(deal.offer_url)).hostname.toLowerCase().replace(/^www[.]/, '') === activeSpuersinnFilter.value; } catch { return false; }
         }
         return String(deal.supplier_name || '').trim().toLocaleLowerCase('de-DE') === activeSpuersinnFilter.value;
-      }) : activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => { const score=userStarRatings.get(String(deal.id)); return activeDealView==='UNRATED' ? !score : activeDealView==='STAR_'+score; });
+      }) : activeDealView === 'ALL' ? (deals || []) : (deals || []).filter(deal => { const score=userStarRatings.get(String(deal.id)); return pendingRatingFinish.has(String(deal.id)) || (activeDealView==='UNRATED' ? !score : activeDealView==='STAR_'+score); });
       const categoryCounts = new Map();
       for (const deal of folderDeals) {
         const name = categoryName(deal);
