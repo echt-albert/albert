@@ -2422,6 +2422,14 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           const priceSuffix=priceScope==='lot'?' · Gesamtposten':priceScope==='unit'?' · je Einheit':'';
           const qty=Number(deal.quantity);
           const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
+          // Never multiply a lot price by quantity; unknown price basis must stay unknown.
+          const lotTotalKnown=priceKnown&&!auction&&(priceScope==='lot'||(priceScope==='unit'&&qtyKnown));
+          const lotTotal=lotTotalKnown?(priceScope==='lot'?price:price*qty):null;
+          const lotTotalLabel=lotTotalKnown
+            ? lotTotal.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')
+            : '—';
+          const lotTotalTitle=priceScope==='lot'?'Gesamtpreis laut Angebot':priceScope==='unit'?'Rechnerisch: Einzelpreis × Menge':'Preisbasis unklar – kein Gesamtpreis berechenbar';
+
           const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
           const platformName=source ? (()=>{try { const host=new URL(source).hostname.replace(/^www[.]/,''); return host==='vertexaisearch.cloud.google.com' ? '' : host; } catch { return ''; }})() : '';
           const supplierLabel=String(deal.supplier_name||'').trim();
@@ -2434,9 +2442,10 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
             '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<div class="deal-header-spuersinn">'+spuersinnHtml(deal)+'</div></div>'+
-            '<div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
+            '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
             '<div><span class="block text-[10px] text-slate-500">Menge</span><strong>'+(qtyKnown?escapeHtml(qty.toLocaleString('de-DE')+' '+(unit&&unit!=='null'?unit:'Einheiten (Art ungeprüft)')):'Unbekannt')+'</strong></div>'+
+            '<div title="'+escapeHtml(lotTotalTitle)+'"><span class="block text-[10px] text-slate-500">Posten gesamt'+(lotTotalKnown?' (ungeprüft)':'')+'</span><strong class="'+(lotTotalKnown?'':'text-slate-500')+'">'+escapeHtml(lotTotalLabel)+'</strong></div>'+
             '<div><span class="block text-[10px] text-slate-500">B2C-Marktpreis (ungeprüft)</span><strong data-card-market-price="'+id+'" class="text-slate-500">'+(quickMarketCache.has(id)&&quickMarketCache.get(id)?.success&&Number(quickMarketCache.get(id).low_eur||quickMarketCache.get(id).cheapest_price_eur)>0?escapeHtml(Number(quickMarketCache.get(id).low_eur||quickMarketCache.get(id).cheapest_price_eur).toLocaleString('de-DE',{style:'currency',currency:'EUR'})):'—')+'</strong></div>'+
             '<div class="col-span-2 sm:col-span-1"><span class="block text-[10px] text-slate-500">Quelle</span>'+(source?'<a class="font-semibold text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot öffnen ↗</a>':'<strong class="text-slate-500">Link fehlt</strong>')+'</div></div>'+
             '<div class="albert-discovery-reason mt-4 text-xs text-slate-700"><strong class="block mb-1">Warum könnte das interessant sein?</strong>'+escapeHtml(reason)+'</div>'+ (signals.length?'<p class="mt-2 text-xs text-slate-500">'+escapeHtml(signals.join(' · '))+'</p>':'')+
