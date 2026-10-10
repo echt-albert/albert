@@ -1771,8 +1771,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     async function saveDealLabels(ids,label){
       const {data:session}=await supabaseClient.auth.getSession();
       if(!session?.session?.access_token)throw Error('Bitte zuerst anmelden.');
-      const {error}=await supabaseClient.from('discoveries').update({deal_label:label||null}).in('id',ids);
-      if(error)throw Error(error.message);
+      const {data:result,error}=await supabaseClient.functions.invoke('albert-scanner-import',{body:{action:'set_label',ids,label}});
+      if(error||!result?.success||result.updated!==ids.length)throw Error(result?.error||error?.message||'Nicht alle Labels gespeichert');
       selectedDealLabelIds.clear();cachedDealSnapshot=null;await fetchDeals();
     }
     document.getElementById('deals-container').addEventListener('change',event=>{
