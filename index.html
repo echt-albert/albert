@@ -870,12 +870,21 @@
       const keyClose = event => { if (event.key === 'Escape') close({target:modal.querySelector('[data-result-close]')}); };
       modal.addEventListener('click', close); document.addEventListener('keydown', keyClose);
     }
+    function dealQuantityBlocked(deal) {
+      return !deal || !Number.isSafeInteger(Number(deal.quantity)) || Number(deal.quantity) <= 0 || deal.decision_grade === 'X';
+    }
+    function requireDealQuantity(deal) {
+      if (!dealQuantityBlocked(deal)) return true;
+      showStatus('X · Ausschluss: Postenmenge fehlt oder Deal ist ausgeschlossen. Keine weitere Analyse oder Kaufempfehlung.', true);
+      return false;
+    }
     const activeCipherResearch = new Set();
     async function searchCipherIdentity(dealId) {
       const id=String(dealId);
       if(activeCipherResearch.has(id))return;
       const deal=window.albertDealsById?.get(id);
       if(!deal){showStatus('Deal nicht gefunden.',true);return;}
+      if (!requireDealQuantity(deal)) return;
       activeCipherResearch.add(id);
       setAlbertActivity('cipher-'+id,'CIPHER · '+(deal.product_name||'Produktidentität'),'Recherchiert EAN, MPN und Produktidentität …');
       await fetchDeals();
@@ -902,6 +911,7 @@
       if(activeOracleSearch.has(id))return;
       const deal=window.albertDealsById?.get(id);
       if(!deal){showStatus('Deal nicht gefunden.',true);return;}
+      if (!requireDealQuantity(deal)) return;
       activeOracleSearch.add(id);
       setAlbertActivity('oracle-'+id,'ORACLE · '+(deal.product_name||'B2C-Preise'),'Recherchiert Händlerangebote …');
       await fetchDeals();
@@ -937,6 +947,7 @@
     }
     async function rateDeal(dealId, action) {
       if (!['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT'].includes(action)) return;
+      if (action === 'DEEP_DIVE' && !requireDealQuantity(window.albertDealsById?.get(String(dealId)))) return;
       const card = document.getElementById('deal-card-' + dealId);
       if (!card) return;
       const panel = document.getElementById('albert-decision-modal');
