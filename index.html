@@ -1776,6 +1776,16 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       activeSpuersinnFilter = null;
       activeCategoryFilter = null;
       activeGradeFilter = null;
+      // Navigation sofort visuell aktualisieren, bevor die Deal-Karten neu aufgebaut werden.
+      document.querySelectorAll('#deal-navigation [data-view]').forEach(item=>{
+        const selected=item.dataset.view===nextView;
+        item.classList.toggle('bg-amber-50',selected);
+        item.classList.toggle('text-amber-900',selected);
+        item.classList.toggle('border',selected);
+        item.classList.toggle('border-amber-200',selected);
+        item.classList.toggle('font-semibold',selected);
+        item.setAttribute('aria-current',selected?'page':'false');
+      });
       fetchDeals(true);
     });
 
@@ -2541,7 +2551,10 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     });
     // Rubrikwechsel rendern aus bereits geladenen Daten, ohne erneute Netzwerkanfragen.
     let cachedDealSnapshot = null;
+    let dealRenderRequest = 0;
     async function fetchDeals(useCached = false) {
+      const requestId = ++dealRenderRequest;
+      const requestedView = activeDealView;
 
       const container =
         document.getElementById('deals-container');
@@ -2562,6 +2575,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if (!error && !feedbackReadError) cachedDealSnapshot = {deals,savedCategories,feedbackRows};
       }
 
+      if (requestId!==dealRenderRequest || requestedView!==activeDealView)return;
       if (error) {
 
         container.innerHTML = `
@@ -2579,7 +2593,10 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
       }
 
-      radarDeals=deals||[];renderSourceRadar();
+      // Veraltete asynchrone Antworten dürfen eine neu gewählte Rubrik nicht überschreiben.
+      if(requestId!==dealRenderRequest || requestedView!==activeDealView)return;
+      radarDeals=deals||[];
+      if(!useCached)renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
 
       if (!categoryError) {
