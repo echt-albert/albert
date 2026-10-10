@@ -812,10 +812,13 @@ function renderScannerPreview(data){
  search.addEventListener('input',render);render();
  const importer=scannerEl('div','mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4');
  const supplier=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm');supplier.placeholder='Quelle / Insolvenzverwalter (optional)';
- const importLabel=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm mt-2');importLabel.placeholder='🏷️ Label für alle Deals (z. B. VENTA 5710)';importLabel.maxLength=48;
+ const importLabel=scannerEl('input','w-full rounded-lg border border-slate-200 p-2 text-sm mt-2');importLabel.placeholder='Label auswählen oder neu eingeben';importLabel.maxLength=48;
+ const suggestions=document.createElement('datalist');suggestions.id='scanner-label-options';importLabel.setAttribute('list',suggestions.id);
+ const refreshImportLabels=async()=>{const {data}=await supabaseClient.from('discoveries').select('deal_label').not('deal_label','is',null);const labels=[...new Set((data||[]).map(d=>String(d.deal_label||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));suggestions.replaceChildren(...labels.map(v=>{const option=document.createElement('option');option.value=v;return option;}));};
+ refreshImportLabels();
  const importBtn=scannerEl('button','mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white','Als Deals in ☆ Unbewertet übernehmen');importBtn.type='button';
  const progress=scannerEl('p','mt-2 text-xs text-slate-600');
- importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importLabel,importBtn,progress);box.append(importer);
+ importer.append(scannerEl('p','text-xs font-semibold text-slate-800','Bestandsliste als einzelne Deals übernehmen'),supplier,importLabel,suggestions,importBtn,progress);box.append(importer);
  importBtn.addEventListener('click',async()=>{
   const find=(...names)=>data.headers.findIndex(h=>names.includes(h.toLowerCase().trim().replace(/\\s+/g,'_')));
   const idx={name:find('produktname','artikelbezeichnung','bezeichnung','artikel','produkt','name'),brand:find('marke','brand'),ean:find('ean','ean_gtin','gtin'),mpn:find('mpn','artikelnummer','herstellerartikelnummer'),qty:find('menge','anzahl','verfuegbare_menge','stückzahl','postenmenge'),price:find('ek','ek_netto','preis_netto_eur','einkaufspreis','ek_pro_stueck_netto','ek_pro_stück_netto','ek_stueck_netto'),basis:find('preisbasis','preiseinheit'),total:find('posten_gesamt_netto','ek_gesamt_netto','ek_gesamt','posten_gesamt','gesamt_ek','einkaufswert_gesamt'),market:find('b2c_marktpreis_inkl_versand','marktpreis_inkl_versand','b2c_marktpreis','b2c_marktpreis_pro_stück_inkl_versand','marktpreis_gesamtpreis'),sale:find('kalkulierter_vk','kalkulierter_vk_inkl_versand','vk_kalkulatorisch','b2c_vk_inkl_versand','vk_inkl_versand','verkaufspreis'),shipping:find('versandkosten','versandkosten_pro_stueck','b2c_versandkosten'),marketing:find('marketingbudget','marketingbudget_gesamt'),demand:find('nachfrage','nachfragesignal','nachfrage_(simulation)'),competition:find('wettbewerb','wettbewerber_(simulation)'),condition:find('zustand'),category:find('kategorie'),risk:find('risiko','risiken'),startBid:find('startpreis_gesamt_eur','startgebot','startpreis','aufrufpreis'),lot:find('positionsnummer','losnummer'),source:find('quelle','quellenlink')};
@@ -1767,7 +1770,31 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let activeSpuersinnFilter = null;
     let activeDealLabelFilter = '';
     const selectedDealLabelIds = new Set();
-    const dealLabelChip = deal => '<button type="button" data-edit-deal-label="'+escapeHtml(deal.id)+'" title="Label vergeben, ändern oder entfernen" class="ml-2 inline-flex align-middle rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:border-cyan-400 hover:text-cyan-700">🏷 '+escapeHtml(deal.deal_label||'+ Label')+'</button>';
+    const dealLabelChip = deal => '<button type="button" data-edit-deal-label="'+escapeHtml(deal.id)+'" title="Label auswählen oder ändern" class="ml-2 inline-flex align-middle rounded-full border '+(deal.deal_label?'border-cyan-200 bg-cyan-50 text-cyan-800':'border-dashed border-slate-300 bg-white text-slate-400')+' px-2.5 py-0.5 text-[11px] font-medium hover:border-cyan-500 hover:bg-cyan-50">'+escapeHtml(deal.deal_label||'+ Label')+'</button>';
+    let knownDealLabels=[];
+    function labelPicker(initial='',count=1){
+      return new Promise(resolve=>{
+        const backdrop=document.createElement('div');
+        backdrop.className='fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 p-4';
+        const dialog=document.createElement('div');dialog.className='w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl';
+        const heading=document.createElement('h3');heading.className='text-base font-semibold text-slate-900';heading.textContent=count===1?'Deal-Label':'Label für '+count+' Deals';
+        const description=document.createElement('p');description.className='mt-1 mb-4 text-xs text-slate-500';description.textContent='Bestehendes Label wählen oder ein neues anlegen.';
+        const select=document.createElement('select');select.className='w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm';
+        const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;return o;};
+        select.append(option('','— Kein Label —'),...knownDealLabels.map(v=>option(v,v)),option('__new__','+ Neues Label erstellen'));
+        select.value=initial&&knownDealLabels.includes(initial)?initial:initial?'__new__':'';
+        const input=document.createElement('input');input.className='mt-2 w-full rounded-lg border border-slate-200 p-2.5 text-sm';input.placeholder='Neues Label, z. B. VENTA 5710';input.maxLength=48;input.value=initial&&!knownDealLabels.includes(initial)?initial:'';input.hidden=select.value!=='__new__';
+        select.addEventListener('change',()=>{input.hidden=select.value!=='__new__';if(!input.hidden)input.focus();});
+        const actions=document.createElement('div');actions.className='mt-5 flex justify-end gap-2';
+        const cancel=document.createElement('button');cancel.className='rounded-lg border border-slate-200 px-3 py-2 text-sm';cancel.textContent='Abbrechen';
+        const save=document.createElement('button');save.className='rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white';save.textContent='Speichern';
+        let done=false;const finish=value=>{if(done)return;done=true;backdrop.remove();document.removeEventListener('keydown',esc);resolve(value);};
+        const esc=e=>{if(e.key==='Escape')finish(null);};
+        cancel.onclick=()=>finish(null);backdrop.addEventListener('click',e=>{if(e.target===backdrop)finish(null);});
+        save.onclick=()=>{const value=select.value==='__new__'?input.value.trim():select.value;if(select.value==='__new__'&&!value){input.focus();return;}finish(value);};
+        actions.append(cancel,save);dialog.append(heading,description,select,input,actions);backdrop.append(dialog);document.body.append(backdrop);document.addEventListener('keydown',esc);select.focus();
+      });
+    }
     async function saveDealLabels(ids,label){
       const {data:session}=await supabaseClient.auth.getSession();
       if(!session?.session?.access_token)throw Error('Bitte zuerst anmelden.');
@@ -1786,9 +1813,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       event.preventDefault();event.stopPropagation();
       const ids=edit?[edit.dataset.editDealLabel]:[...selectedDealLabelIds];if(!ids.length){alert('Bitte zuerst Deals markieren.');return;}
       const current=edit?(window.albertDealsById?.get(String(ids[0]))?.deal_label||''):'';
-      const input=prompt(ids.length===1?'Label eingeben (leer = entfernen):':'Label für '+ids.length+' Deals (leer = entfernen):',current);
-      if(input===null)return;
-      const label=input.trim();if(label.length>48){alert('Maximal 48 Zeichen.');return;}
+      const label=await labelPicker(current,ids.length);
+      if(label===null)return;
       try{await saveDealLabels(ids,label);}catch(e){alert('Label konnte nicht gespeichert werden: '+e.message);}
     });
     document.getElementById('deals-container').addEventListener('click', event => {
@@ -2652,6 +2678,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       if(requestId!==dealRenderRequest || requestedView!==activeDealView)return;
       const importedTestById=new Map((scannerTestValues||[]).map(v=>[String(v.discovery_id),v.values_json]));
       for(const deal of deals||[])deal.scanner_test_values=importedTestById.get(String(deal.id))||null;
+      knownDealLabels=[...new Set((deals||[]).map(d=>String(d.deal_label||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
       radarDeals=deals||[];
       if(!useCached)renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
