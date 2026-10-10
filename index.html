@@ -386,6 +386,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       </div>
 
       <button type="button" id="source-radar-nav" onclick="toggleSourceRadar()" aria-pressed="false" class="w-full rounded-xl px-3 py-3 text-left text-xs hover:bg-amber-50">🛰️ Quellenradar <span id="source-count">–</span></button>
+      <button type="button" id="list-scanner-nav" onclick="openListScanner()" class="w-full mt-2 mb-3 flex items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-700 hover:bg-cyan-50 hover:text-cyan-800 transition-colors" aria-controls="list-scanner-page" aria-expanded="false"><svg class="w-4 h-4 text-[#24a1d6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8z"/><path d="M14 3v6h7M8 13h8M8 17h8"/></svg><span>Listen-Scanner</span><span class="ml-auto text-[10px] font-normal text-slate-400">CSV</span></button>
       <nav id="deal-navigation" class="space-y-1.5" aria-label="Meine Deal-Bewertungen"><p class="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Meine Deal-Ablage</p>
         <button type="button" data-view="UNRATED" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span>☆ Unbewertet</span><span data-count="UNRATED" class="font-mono text-[11px]">–</span></button>
         <button type="button" data-view="STAR_5" class="deal-view w-full flex items-center justify-between rounded-xl px-3 py-3 text-left text-xs text-slate-700 hover:bg-slate-50"><span><span class="text-amber-500">★★★★★</span><span class="text-slate-300"></span></span><span data-count="STAR_5" class="font-mono text-[11px]">–</span></button>
@@ -472,7 +473,17 @@ body.albert-account-open .albert-auth-panel{display:block!important}
 
     <main class="max-w-7xl w-full mx-auto px-4 md:px-8 py-8">
 
-      <div class="albert-layout">
+      <section id="list-scanner-page" class="hidden max-w-3xl mx-auto" aria-label="Listen-Scanner">
+        <div class="flex items-center justify-between gap-3 mb-7"><div><p class="text-[11px] font-semibold uppercase tracking-[.16em] text-[#24a1d6]">EINKAUF · DATEIIMPORT</p><h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Listen-Scanner</h2><p class="mt-2 text-sm text-slate-500">Bestandslisten einlesen. Die Auswertung bauen wir im nächsten Schritt.</p></div><button type="button" onclick="closeListScanner()" class="rounded-xl border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50">Zurück zu Deals</button></div>
+        <div id="list-scanner-dropzone" role="button" tabindex="0" aria-label="CSV-Datei auswählen oder hier ablegen" class="rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-14 text-center cursor-pointer hover:border-[#24a1d6] hover:bg-cyan-50/30 transition-colors">
+          <div class="mx-auto flex w-14 h-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#24a1d6]"><svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+          <h3 class="mt-5 text-base font-semibold text-slate-900">CSV-Datei hier ablegen</h3><p class="mt-2 text-sm text-slate-500">Oder klicken und Datei auswählen</p><span class="mt-5 inline-block rounded-full bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white">CSV auswählen</span><p class="mt-4 text-[11px] text-slate-400">Nur .csv · Maximal 10 MB · Verarbeitung lokal im Browser</p>
+          <input type="file" id="list-scanner-input" accept=".csv,text/csv" class="sr-only" aria-label="CSV hochladen">
+        </div>
+        <div id="list-scanner-result" class="hidden mt-5 rounded-2xl border border-slate-200 bg-white p-6" role="status" aria-live="polite"></div>
+        <p class="mt-5 text-xs text-slate-400">Noch kein Import in die Deal-Datenbank und keine automatische Analyse.</p>
+      </section>
+      <div class="albert-layout" id="albert-deals-layout">
 
         <!-- LINKER BEREICH -->
 
@@ -587,6 +598,46 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <script>
 
 
+function openListScanner(){
+  document.getElementById('list-scanner-page')?.classList.remove('hidden');
+  document.getElementById('albert-deals-layout')?.classList.add('hidden');
+  const btn=document.getElementById('list-scanner-nav');btn?.setAttribute('aria-expanded','true');btn?.classList.add('bg-cyan-50','text-cyan-800');
+}
+function closeListScanner(){
+  document.getElementById('list-scanner-page')?.classList.add('hidden');
+  document.getElementById('albert-deals-layout')?.classList.remove('hidden');
+  const btn=document.getElementById('list-scanner-nav');btn?.setAttribute('aria-expanded','false');btn?.classList.remove('bg-cyan-50','text-cyan-800');
+}
+function countCsvRows(raw){
+  // Count logical records, not line breaks within quoted fields.
+  const sep=(raw.split(/\r?\n/,1)[0].match(/;/g)||[]).length>(raw.split(/\r?\n/,1)[0].match(/,/g)||[]).length?';':',';
+  let quoted=false,records=0,nonEmpty=false;
+  for(let i=0;i<raw.length;i++){const c=raw[i];if(c==='"'){if(quoted&&raw[i+1]==='"'){i++;continue;}quoted=!quoted;}else if(!quoted&&(c==='\n'||c==='\r')){if(nonEmpty)records++;nonEmpty=false;if(c==='\r'&&raw[i+1]==='\n')i++;}else if(c.trim())nonEmpty=true;}
+  if(nonEmpty)records++;
+  return {rows:Math.max(0,records-1),separator:sep,valid:!quoted};
+}
+async function handleListScannerFile(file){
+  if(!file)return;
+  const result=document.getElementById('list-scanner-result');result.classList.remove('hidden');result.replaceChildren();
+  const heading=document.createElement('h3');heading.className='font-semibold text-slate-900';heading.textContent=file.name;result.append(heading);
+  const detail=document.createElement('p');detail.className='mt-2 text-sm text-slate-500';result.append(detail);
+  if(!/\.csv$/i.test(file.name)){detail.textContent='Bitte eine CSV-Datei auswählen.';return;}
+  if(file.size>10*1024*1024){detail.textContent='Die Datei ist größer als 10 MB.';return;}
+  try{const raw=await file.text();const parsed=countCsvRows(raw);if(!parsed.valid)throw Error('CSV enthält nicht geschlossene Anführungszeichen.');
+    detail.textContent=(file.size/1024).toLocaleString('de-DE',{maximumFractionDigits:1})+' KB · '+parsed.rows.toLocaleString('de-DE')+' Datenzeilen erkannt';
+    const note=document.createElement('p');note.className='mt-3 text-xs text-cyan-800';note.textContent='Datei lokal eingelesen. Noch keine Speicherung, Analyse oder Übernahme in Deals.';result.append(note);
+  }catch(e){detail.textContent='Datei konnte nicht eingelesen werden: '+(e.message||'Unbekannter Fehler');}
+}
+document.addEventListener('DOMContentLoaded',()=>{
+ const zone=document.getElementById('list-scanner-dropzone'),input=document.getElementById('list-scanner-input');
+ if(!zone||!input)return;
+ zone.addEventListener('click',()=>input.click());
+ zone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();input.click();}});
+ input.addEventListener('change',()=>handleListScannerFile(input.files?.[0]));
+ zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('border-[#24a1d6]','bg-cyan-50');});
+ zone.addEventListener('dragleave',()=>zone.classList.remove('border-[#24a1d6]','bg-cyan-50'));
+ zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('border-[#24a1d6]','bg-cyan-50');handleListScannerFile(e.dataTransfer?.files?.[0]);});
+});
 let radarDeals=[];let researchedSources=[];
 function radarState(){try{return JSON.parse(localStorage.getItem('albert-radar-v1')||'{}')}catch{return {}}}
 function radarSave(k,a){const d=radarState();d[k]={action:a,date:new Date().toISOString()};localStorage.setItem('albert-radar-v1',JSON.stringify(d));renderSourceRadar()}
