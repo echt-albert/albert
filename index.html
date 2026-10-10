@@ -1950,33 +1950,118 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       }
     }
     // Persönliches Lernsignal: breite Entdeckung bleibt unverändert, keine Präferenzfilter.
+    // Käufer-Lernen V1: Sterne + selbst definierte Gründe. Keine Recherchefilter.
+    const baseRatingReasons = ['Preis / Marge','Nachfrage / Markt','Produkt / Marke','Menge / Kapital','Bezugsquelle','Risiko'];
     let userStarRatings = new Map();
+    let userRatingReasons = new Map();
+    let customRatingReasons = [];
     let ratingUserId = null;
+    let learningDealIndex = [];
+    const ratingBusy = new Set();
+    function learningTokens(deal) {
+      const parts = [deal.category,deal.brand,deal.supplier_name];
+      const url = String(deal.offer_url||'');
+      try {parts.push(new URL(url).hostname.replace(/^www\\./,''));}catch(e){}
+      const name = String(deal.product_name||'').toLocaleLowerCase('de-DE').split(/[^\\p{L}\\p{N}]+/u).filter(x=>x.length>3).slice(0,6);
+      const price=Number(deal.purchase_price), qty=Number(deal.quantity);
+      if(Number.isFinite(price)&&price>0)parts.push('preis:'+Math.floor(Math.log2(price)));
+      if(Number.isFinite(qty)&&qty>0)parts.push('menge:'+Math.floor(Math.log2(qty)));
+      return new Set([...parts,...name].filter(Boolean).map(x=>String(x).toLocaleLowerCase('de-DE')));
+    }
+    function predictBuyerInterest(deal) {
+      const tokens=learningTokens(deal), neighbors=[];
+      for(const other of learningDealIndex) {
+        if(String(other.id)===String(deal.id))continue;
+        const stars=userStarRatings.get(String(other.id));
+        if(!stars)continue;
+        const otherTokens=learningTokens(other);
+        let overlap=0;for(const token of tokens)if(otherTokens.has(token))overlap++;
+        if(!overlap)continue;
+        const sharedReasons=(userRatingReasons.get(String(other.id))||[]).length;
+        neighbors.push({stars,weight:Math.min(overlap,4)+(sharedReasons?0.1:0)});
+      }
+      neighbors.sort((a,b)=>b.weight-a.weight);
+      const best=neighbors.slice(0,12);
+      if(best.length<3)return null;
+      const weight=best.reduce((sum,n)=>sum+n.weight,0);
+      return {stars:best.reduce((sum,n)=>sum+n.stars*n.weight,0)/weight, count:best.length};
+    }
     function starWidget(id) {
-      const score = userStarRatings.get(String(id)) || 0;
-      return '<div class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3" data-star-rating="'+escapeHtml(id)+'"><span class="text-xs text-slate-500">Deine Bewertung</span><div class="flex gap-1" role="group" aria-label="Deal mit 1 bis 5 Sternen bewerten">'+
-        [1,2,3,4,5].map(n=>'<button type="button" data-star-value="'+n+'" data-star-id="'+escapeHtml(id)+'" aria-label="'+n+' Sterne" aria-pressed="'+(score===n)+'" class="text-2xl leading-none hover:scale-110 transition-transform '+(n<=score?'text-amber-500':'text-slate-300')+'">★</button>').join('')+
-        '</div></div>';
+      const score=userStarRatings.get(String(id))||0;
+      const selected=userRatingReasons.get(String(id))||[];
+      const reasons=[...new Set([...baseRatingReasons,...customRatingReasons])];
+      const chips=score?'<div class="mt-2 flex flex-wrap gap-1.5">'+reasons.map(reason=>'<button type="button" data-rating-reason="'+escapeHtml(reason)+'" data-rating-id="'+escapeHtml(id)+'" aria-pressed="'+selected.includes(reason)+'" class="rounded-full border px-2 py-1 text-[11px] '+(selected.includes(reason)?'border-amber-400 bg-amber-100 text-amber-900':'border-slate-200 bg-white text-slate-600 hover:bg-amber-50')+'">'+escapeHtml(reason)+'</button>').join('')+'</div><div class="mt-2 flex flex-wrap items-center gap-2"><input type="text" maxlength="60" data-new-rating-reason="'+escapeHtml(id)+'" placeholder="Eigener Grund …" aria-label="Eigenen Bewertungsgrund hinzufügen" class="min-w-0 w-44 rounded-lg border border-slate-200 px-2 py-1.5 text-xs"><button type="button" data-add-rating-reason="'+escapeHtml(id)+'" class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs hover:bg-amber-50">+ Grund speichern</button></div>':'';
+      const deal=learningDealIndex.find(d=>String(d.id)===String(id));
+      const prediction=!score&&deal?predictBuyerInterest(deal):null;
+      const hint=prediction?'<span class="ml-auto text-[10px] text-slate-400" title="Unverbindliche Schätzung aus ähnlichen bewerteten Deals, kein wirtschaftliches Urteil">Albert vermutet: '+escapeHtml(prediction.stars.toFixed(1))+'/5 · unsicher</span>':'';
+      return '<div class="mt-3 border-t border-slate-100 pt-3" data-star-rating="'+escapeHtml(id)+'"><div class="flex items-center gap-2 flex-wrap"><span class="text-xs text-slate-500">Deine Bewertung</span><div class="flex gap-1" role="group" aria-label="Deal mit 1 bis 5 Sternen bewerten">'+
+        [1,2,3,4,5].map(n=>'<button type="button" data-star-value="'+n+'" data-star-id="'+escapeHtml(id)+'" aria-label="'+n+' Sterne" aria-pressed="'+(score===n)+'" class="text-2xl leading-none hover:scale-110 transition-transform '+(n<=score?'text-amber-500':'text-slate-300')+'">★</button>').join('')+'</div>'+hint+'</div>'+
+        (score?'<p class="mt-1 text-[11px] text-slate-500">Warum? Freiwillig · Mehrfachauswahl</p>':'')+chips+'</div>';
+    }
+    function refreshRatingWidget(id) {
+      const holder=document.querySelector('[data-star-rating="'+CSS.escape(String(id))+'"]');
+      if(holder)holder.outerHTML=starWidget(id);
     }
     async function loadStarRatings() {
-      const {data:{user}} = await supabaseClient.auth.getUser();
-      ratingUserId = user?.id || null;
-      if (!ratingUserId) {userStarRatings = new Map();return;}
-      const {data,error} = await supabaseClient.from('deal_user_star_ratings').select('discovery_id,stars').eq('user_id',ratingUserId);
-      if (!error) userStarRatings = new Map((data||[]).map(r=>[String(r.discovery_id),r.stars]));
+      const {data:{user}}=await supabaseClient.auth.getUser();
+      ratingUserId=user?.id||null;
+      if(!ratingUserId){userStarRatings=new Map();userRatingReasons=new Map();customRatingReasons=[];return;}
+      const [ratings,custom]=await Promise.all([
+        supabaseClient.from('deal_user_star_ratings').select('discovery_id,stars,reasons').eq('user_id',ratingUserId),
+        supabaseClient.from('buyer_rating_reasons').select('label').eq('user_id',ratingUserId).order('created_at')
+      ]);
+      if(!ratings.error){
+        userStarRatings=new Map((ratings.data||[]).map(r=>[String(r.discovery_id),r.stars]));
+        userRatingReasons=new Map((ratings.data||[]).map(r=>[String(r.discovery_id),r.reasons||[]]));
+      }
+      if(!custom.error)customRatingReasons=(custom.data||[]).map(r=>r.label);
+    }
+    async function saveBuyerRating(id) {
+      if(ratingBusy.has(id))return false;
+      ratingBusy.add(id);
+      const {error}=await supabaseClient.from('deal_user_star_ratings').upsert({
+        discovery_id:Number(id),user_id:ratingUserId,stars:userStarRatings.get(id),
+        reasons:userRatingReasons.get(id)||[],updated_at:new Date().toISOString()
+      },{onConflict:'discovery_id,user_id'});
+      ratingBusy.delete(id);
+      if(error){showStatus('Bewertung konnte nicht gespeichert werden: '+error.message,true);return false;}
+      return true;
     }
     document.getElementById('deals-container').addEventListener('click',async event=>{
-      const button=event.target.closest('[data-star-value]');
-      if(!button)return;
+      const star=event.target.closest('[data-star-value]');
+      const reason=event.target.closest('[data-rating-reason]');
+      const add=event.target.closest('[data-add-rating-reason]');
+      if(!star&&!reason&&!add)return;
       event.preventDefault();event.stopPropagation();
-      const id=button.dataset.starId, stars=Number(button.dataset.starValue);
-      if(!ratingUserId){showStatus('Bitte zuerst beim Einkäufer-Konto anmelden, um Sterne zu speichern.',true);return;}
-      const previous=userStarRatings.get(id);
-      userStarRatings.set(id,stars);
-      const holder=button.closest('[data-star-rating]');
-      if(holder)holder.outerHTML=starWidget(id);
-      const {error}=await supabaseClient.from('deal_user_star_ratings').upsert({discovery_id:Number(id),user_id:ratingUserId,stars,updated_at:new Date().toISOString()},{onConflict:'discovery_id,user_id'});
-      if(error){if(previous)userStarRatings.set(id,previous);else userStarRatings.delete(id);showStatus('Sterne konnten nicht gespeichert werden: '+error.message,true);}
+      if(!ratingUserId){showStatus('Bitte zuerst beim Einkäufer-Konto anmelden.',true);return;}
+      if(star){
+        const id=String(star.dataset.starId),old=userStarRatings.get(id);
+        userStarRatings.set(id,Number(star.dataset.starValue));refreshRatingWidget(id);
+        if(!await saveBuyerRating(id)){if(old)userStarRatings.set(id,old);else userStarRatings.delete(id);refreshRatingWidget(id);}
+      }else if(reason){
+        const id=String(reason.dataset.ratingId),label=reason.dataset.ratingReason;
+        const old=[...(userRatingReasons.get(id)||[])],next=new Set(old);
+        if(next.has(label))next.delete(label);else next.add(label);
+        userRatingReasons.set(id,[...next]);refreshRatingWidget(id);
+        if(!await saveBuyerRating(id)){userRatingReasons.set(id,old);refreshRatingWidget(id);}
+      }else if(add){
+        const id=String(add.dataset.addRatingReason);
+        const input=document.querySelector('[data-new-rating-reason="'+CSS.escape(id)+'"]');
+        const label=String(input?.value||'').trim().replace(/\\s+/g,' ');
+        if(label.length<2||label.length>60){showStatus('Bitte einen Grund mit 2–60 Zeichen eingeben.',true);return;}
+        const existing=[...baseRatingReasons,...customRatingReasons].find(x=>x.toLocaleLowerCase('de-DE')===label.toLocaleLowerCase('de-DE'));
+        const chosen=existing||label;
+        if(!existing){
+          const {error}=await supabaseClient.from('buyer_rating_reasons').insert({user_id:ratingUserId,label:chosen});
+          if(error){showStatus('Grund konnte nicht gespeichert werden: '+error.message,true);return;}
+          customRatingReasons.push(chosen);
+        }
+        const old=[...(userRatingReasons.get(id)||[])];
+        userRatingReasons.set(id,[...new Set([...old,chosen])]);
+        if(!await saveBuyerRating(id))userRatingReasons.set(id,old);
+        // Neue Gründe auf allen sichtbaren Karten anbieten, ohne Daten neu zu laden.
+        document.querySelectorAll('[data-star-rating]').forEach(node=>refreshRatingWidget(node.dataset.starRating));
+      }
     });
     // Rubrikwechsel rendern aus bereits geladenen Daten, ohne erneute Netzwerkanfragen.
     let cachedDealSnapshot = null;
@@ -2125,6 +2210,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           ? '<button type="button" data-spuersinn-clear class="mt-2 block w-full rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:bg-cyan-100/70" title="Spürsinn-Filter entfernen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Filter entfernen ×</span></button>'
           : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
       };
+      learningDealIndex = deals || [];
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
       const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between gap-3"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><div class="flex items-center gap-3"><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span>' + (activeSpuersinnFilter ? '<button type="button" data-spuersinn-clear class="rounded-lg border border-cyan-200 px-2.5 py-1 text-xs text-cyan-800 hover:bg-cyan-50">Filter entfernen ×</button>' : '') + '</div></div>';
