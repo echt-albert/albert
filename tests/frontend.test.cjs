@@ -24,9 +24,12 @@ test('HTML has a document, title and deal container', () => {
 test('all inline JavaScript parses', () => {
   for (const code of scripts) assert.doesNotThrow(() => new vm.Script(code));
 });
-test('discovery-first interface keeps four buyer decisions and defers analysis', () => {
+test('discovery-first interface opens seven-part deal file on demand', () => {
   assert.match(script, /let activeDealView = 'UNRATED'/);
-  assert.match(script, /activeDealView !== 'DEEP_DIVE'/);
+  assert.match(script, /if\(!isDealExpanded\(deal\.id, activeDealView\)\)/);
+  assert.match(script, /data-open-dealakte/);
+  assert.match(script, /data-close-dealakte/);
+  assert.match(script, /data-deal-division/);
   for (const action of ['WATCH', 'DEEP_DIVE', 'LEARN', 'REJECT']) assert.ok(script.includes(action), 'missing ' + action);
   assert.match(script, /saved\.map\(item => item\.id\)/);
   assert.doesNotMatch(script.slice(script.indexOf('async function runBrainResearch('),script.indexOf('window.triggerManualHunt =')), /mode: 'pipeline'/);
