@@ -1283,7 +1283,10 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     function renderQuickMarket(id,data){
       const el=document.querySelector('[data-quick-market="'+id+'"]');if(!el)return;
       const eur=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
-      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">'+(data?.error?'Preisabfrage fehlgeschlagen · erneut versuchen':data?.reason?'Keine Treffer: '+escapeHtml(data.reason):'Keine Preisindikation gefunden · ungeprüft')+'</span>';return;}
+      const deal=window.albertDealsById?.get(String(id))||{};
+      const terms=[deal.brand,deal.mpn,deal.product_name].filter(Boolean).join(' ').trim()||deal.ean_gtin||'';
+      const googleLink=terms?'<a class="text-cyan-700 underline ml-2" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=shop&gl=de&hl=de&q='+encodeURIComponent(terms)+'">Google Shopping ↗</a>':'';
+      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">'+(data?.error?'Preisabfrage fehlgeschlagen · erneut versuchen':data?.reason?'Keine Treffer: '+escapeHtml(data.reason):'Keine Preisindikation gefunden · ungeprüft')+'</span>'+googleLink;return;}
       const lo=data.low_eur||data.cheapest_price_eur,hi=data.high_eur;
       const range=hi&&hi>lo?eur(lo)+'–'+eur(hi):'ab '+eur(lo);
       const link=data.cheapest_url?'<a class="text-cyan-700 underline" target="_blank" rel="noopener noreferrer" href="'+escapeHtml(data.cheapest_url)+'">'+escapeHtml(data.cheapest_merchant||'Anbieter')+' ↗</a>':escapeHtml(data.cheapest_merchant||'');
