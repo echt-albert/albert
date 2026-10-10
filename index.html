@@ -134,6 +134,19 @@
 .deal-divisions > .deal-ai-wide-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
 .deal-ai-wide-grid > div { min-width: 0; }
 @media (max-width: 760px) { .deal-divisions > .deal-ai-wide-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Deal-Akte: kompakte Entscheidungsansicht; Detailakte bleibt unverändert. */
+.deal-compact .deal-header { margin-bottom: 12px !important; }
+.deal-compact .deal-status-guidance, .deal-compact .deal-b2c-market, .deal-compact .deal-compact-summary { display:none !important; }
+.deal-compact > .deal-decision-overview { display:block !important; }
+.deal-decision-overview { display:none; }
+.deal-overview-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.deal-overview-metric { background:#f8fafc; border:1px solid #e2e8f0; border-radius:11px; padding:11px 12px; min-width:0; }
+.deal-overview-metric small { display:block; color:#64748b; font-size:10px; margin-bottom:5px; }
+.deal-overview-metric strong { display:block; color:#1e293b; font-size:14px; overflow-wrap:anywhere; }
+.deal-overview-next { margin-top:10px; border:1px solid #fde68a; background:#fffbeb; border-radius:11px; padding:11px 13px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+@media(max-width:900px) { .deal-overview-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) { .deal-overview-next { flex-direction:column; align-items:flex-start; } }
 </style>
 </head>
 
@@ -1634,6 +1647,20 @@
 
             </div>
 
+
+            <!-- KOMPAKTE ENTSCHEIDUNGSANSICHT: keine redundanten Statusboxen -->
+            <div class="deal-decision-overview" aria-label="Deal auf einen Blick">
+              <div class="deal-overview-metrics">
+                <div class="deal-overview-metric"><small>Einkaufspreis · Posten</small><strong>${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'Unbekannt'}</strong></div>
+                <div class="deal-overview-metric"><small>Deutscher B2C-Gesamtpreis</small><strong>${b2cLowest == null ? 'Unbekannt' : escapeHtml(b2cLowest.toFixed(2)) + ' €'}</strong></div>
+                <div class="deal-overview-metric"><small>Wirtschaftliches Potenzial</small><strong>${b2cLowest == null ? 'Nicht berechenbar' : 'Marktpreis vorhanden'}</strong></div>
+                <div class="deal-overview-metric"><small>Alberts Einstufung</small><strong>${escapeHtml(deal.decision_grade || 'Offen')} · ${escapeHtml(actionLabel)}</strong></div>
+              </div>
+              <div class="deal-overview-next">
+                <div class="min-w-0 text-xs text-slate-700"><strong class="text-amber-900">Albert empfiehlt:</strong> ${escapeHtml(dealGuidance.next)}</div>
+                <button type="button" data-deal-id="${dealId}" class="deal-guidance-action shrink-0 text-xs font-semibold text-amber-900 hover:underline">Nächsten Schritt wählen →</button>
+              </div>
+            </div>
 
             <div class="deal-status-guidance rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4 text-xs" aria-label="Albert-Status und nächster Schritt">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
