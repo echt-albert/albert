@@ -32,7 +32,9 @@ function candidatesFrom(raw: string): Candidate[] {
     : value?.offer_url ? [value] : [];
   return arr.filter(x => x && typeof x === "object").slice(0, 12);
 }
-// URLs are syntactically checked, but not fetched from the server.\n// Server-side arbitrary URL fetches would create an SSRF risk.\nserve(async req => {
+// URLs are syntactically checked, but not fetched from the server.
+// Server-side arbitrary URL fetches would create an SSRF risk.
+serve(async req => {
   if (req.method === "OPTIONS") return reply({});
   if (req.method !== "POST") return reply({ success: false, error: "POST only" }, 405);
   const key = Deno.env.get("GEMINI_API_KEY");
@@ -81,7 +83,8 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       const productName = text(candidate.product_name).slice(0, 255);
       if (!offerUrl || !productName || seen.has(offerUrl)) { stats.invalid++; continue; }
       seen.add(offerUrl);
-      const urlState = "unverified"; // Human/grounded verification is required.\n      stats.urlUnverified++;
+      const urlState = "unverified"; // Human/grounded verification is required.
+      stats.urlUnverified++;
       const existing = await db.from("discoveries").select("id").eq("offer_url", offerUrl).limit(1);
       if (existing.error) throw existing.error;
       if (existing.data?.length) { stats.duplicates++; continue; }
