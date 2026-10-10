@@ -168,6 +168,21 @@
 .deal-header-actions{grid-column:2;grid-row:2;align-self:start}
 .deal-compact .deal-header{grid-template-columns:minmax(0,1fr)}
 @media(max-width:640px){.deal-header{grid-template-columns:minmax(0,1fr)}.deal-header-actions{grid-column:1;grid-row:3}}
+/* Ruhiger, zweistufiger Deal-Kopf: Produkt zuerst, Bewertung rechts, Metadaten darunter */
+.deal-header.deal-header-refined{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:11px 18px;align-items:center;margin-bottom:18px!important}
+.deal-header-refined .deal-header-primary{grid-column:1;grid-row:1;min-width:0}
+.deal-header-refined .deal-product-title{font-size:19px;line-height:1.32;font-weight:650;letter-spacing:-.025em;color:#1e293b;overflow-wrap:anywhere;margin:0 0 5px}
+.deal-header-refined .deal-product-subtitle{display:flex;align-items:center;gap:7px;color:#64748b;font-size:11px;line-height:1.4}
+.deal-header-refined .deal-category-edit{border:0;background:transparent;color:#94a3b8;padding:1px 4px;border-radius:5px;cursor:pointer}
+.deal-header-refined .deal-category-edit:hover,.deal-header-refined .deal-category-edit:focus-visible{color:#92400e;background:#fffbeb}
+.deal-header-refined .deal-header-actions{grid-column:2;grid-row:1;display:flex!important;align-items:center;gap:11px;flex-wrap:nowrap;justify-content:flex-end}
+.deal-grade-compact{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;font-weight:600;color:#64748b}
+.deal-grade-compact strong{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;background:#f1f5f9;color:#64748b}
+.deal-grade-a strong{background:#dcfce7;color:#166534}.deal-grade-b strong{background:#e0f2fe;color:#0369a1}.deal-grade-c strong{background:#fef3c7;color:#92400e}.deal-grade-x strong{background:#ffe4e6;color:#be123c}
+.deal-header-refined .deal-header-meta{grid-column:1/-1;grid-row:2;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:10px;color:#94a3b8;line-height:1.5;border-top:1px solid #f1f5f9;padding-top:10px}
+.deal-header-refined .deal-evaluate-button{padding:8px 13px;border-radius:11px}
+.deal-compact .deal-header.deal-header-refined{grid-template-columns:minmax(0,1fr) auto}
+@media(max-width:700px){.deal-header.deal-header-refined,.deal-compact .deal-header.deal-header-refined{grid-template-columns:minmax(0,1fr)}.deal-header-refined .deal-header-actions{grid-column:1;grid-row:2;justify-content:flex-start}.deal-header-refined .deal-header-meta{grid-row:3}}
 /* Deal-Akte: schlanker Kopf und sieben direkt anwählbare Abteilungen */
 .deal-division-nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:12px 0 16px}
 .deal-division-link{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:11px 9px;border:1px solid #e2e8f0;border-radius:11px;background:#fff;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
@@ -1704,62 +1719,32 @@
           <article id="deal-card-${dealId}" data-market-verified="${deal.market_deep_dive?.verified_lowest_total_price != null}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : ''}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <!-- DEAL HEADER -->
 
-            <div class="deal-header flex flex-wrap justify-between items-start gap-4 mb-6">
-              <div class="deal-header-status w-full flex justify-end"><span title="${escapeHtml(deepStatus.detail)}" class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${deepStatus.color}">${escapeHtml(deepStatus.label)}</span></div>
-
-              <div class="min-w-0">
-
-                <div class="flex flex-wrap items-center gap-2 mb-1.5">
-
-                  <span class="text-[10px] font-medium uppercase tracking-wider text-cyan-700 mono bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">
-                    ${escapeHtml(categoryName(deal))}
-                  </span>
-                  <button type="button" onclick="openCategoryEditor('${dealId}')" class="text-[10px] text-slate-500 hover:text-amber-800 px-1.5 py-0.5 rounded hover:bg-amber-50" title="Kategorie ändern oder neu erstellen">✎ Kategorie</button>
-                  <span class="text-[10px] font-medium uppercase tracking-wider mono px-2 py-0.5 rounded border ${deal.hunt_origin === 'SOFORT' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-100 border-slate-200'}">
-                    ${deal.hunt_origin === 'SOFORT' ? '⚡ Sofort-Jagd' : '↻ Permanente Jagd'}
-                  </span>
-
-                  <span class="text-[10px] text-slate-400 mono">
-                    Run ID #${escapeHtml(deal.research_run_id || '—')}
-                  </span>
-
+            <div class="deal-header deal-header-refined">
+              <div class="deal-header-primary">
+                <h2 class="deal-product-title">${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}</h2>
+                <div class="deal-product-subtitle">
+                  <span>${escapeHtml(categoryName(deal))}</span>
+                  <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
                 </div>
-
-                <h2 class="text-base font-semibold text-[#1d1d1f] tracking-tight break-words">
-                  ${escapeHtml(deal.product_name || 'Unbekanntes Produkt')}
-                </h2>
-
               </div>
-
-              <div class="deal-header-actions flex items-center gap-3">
-                <span class="deal-initial-grade ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-initial-grade-'+deal.decision_grade.toLowerCase() : 'deal-initial-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
-                  <span class="deal-initial-grade-label">KI-Einschätzung</span>
-                  <strong>${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : '—'}</strong>
+              <div class="deal-header-actions">
+                <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
+                  <span>KI</span><strong>${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : '—'}</strong>
                 </span>
-
-
-                <div class="text-right">
-
-                  <span class="text-[10px] text-slate-400 mono block">
-                    Erfasst
-                  </span>
-
-                  <span class="text-[11px] mono text-slate-600">
-                    ${escapeHtml(formattedDate)}
-                  </span>
-
-                </div>
-
-                <button type="button" data-deal-id="${dealId}" onclick="openVerdictChoices('${dealId}')" class="deal-evaluate-button" aria-label="Deal bewerten">
-                  Deal bewerten ↗
-                </button>
-
+                <button type="button" data-deal-id="${dealId}" onclick="openVerdictChoices('${dealId}')" class="deal-evaluate-button" aria-label="Deal bewerten">Deal bewerten ↗</button>
               </div>
-
+              <div class="deal-header-meta">
+                <span title="${escapeHtml(deepStatus.detail)}">${escapeHtml(deepStatus.label)}</span>
+                <span aria-hidden="true">·</span>
+                <span>${deal.hunt_origin === 'SOFORT' ? 'Sofort-Jagd' : 'Permanente Jagd'}</span>
+                <span aria-hidden="true">·</span>
+                <span>${escapeHtml(formattedDate)}</span>
+                <span aria-hidden="true">·</span>
+                <span>#${escapeHtml(deal.research_run_id || '—')}</span>
+              </div>
             </div>
 
-
-            <!-- FÜNF KAUFMÄNNISCHE ECKDATEN -->
+                        <!-- FÜNF KAUFMÄNNISCHE ECKDATEN -->
             <div class="deal-facts" aria-label="Posten auf einen Blick">
               <div class="deal-fact"><span class="deal-fact-label">Posten</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' Stk.' : 'Menge unbekannt'}</strong></div>
               <div class="deal-fact"><span class="deal-fact-label">Inhalt</span><strong class="deal-fact-value">${Number.isSafeInteger(Number(deal.quantity)) && Number(deal.quantity)>0 ? escapeHtml(String(deal.quantity))+' × ' : ''}${escapeHtml(deal.product_name || 'Artikel unbekannt')}</strong><small class="deal-fact-hint">Verpackungseinheiten nicht bestätigt</small></div>
