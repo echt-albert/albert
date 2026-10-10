@@ -1996,13 +1996,16 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           const qty=Number(deal.quantity);
           const qtyKnown=Number.isSafeInteger(qty)&&qty>0;
           const identity=[deal.brand,deal.mpn,deal.ean_gtin].filter(Boolean).map(String).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+          const platformName=source ? (()=>{try { const host=new URL(source).hostname.replace(/^www[.]/,''); return host==='vertexaisearch.cloud.google.com' ? '' : host; } catch { return ''; }})() : '';
+          const supplierLabel=String(deal.supplier_name||'').trim();
+          const supplierHeader='<div class="mt-2 text-xs text-slate-600"><span class="font-semibold">Anbieter: </span>'+escapeHtml(supplierLabel||'Nicht bekannt')+(platformName?' <span class="text-slate-400">· Plattform: '+escapeHtml(platformName)+'</span>':'')+(source?' <a class="text-cyan-700 hover:underline" href="'+source+'" target="_blank" rel="noopener noreferrer">Angebot ↗</a>':'')+'</div>';
           const signals=[deal.supplier_name?('Anbieter: '+deal.supplier_name):null].filter(Boolean);
           const sourcingEvidence=[deal.sourcing_reason,deal.deal_reason,deal.opportunity_reason,deal.research_reason,deal.why_interesting,deal.short_description,typeof deal.decision_reason==='string'&&deal.decision_reason.startsWith('RADAR-Hinweis (ungeprüft):')?deal.decision_reason.split(' · ')[0].replace('RADAR-Hinweis (ungeprüft): ',''):null].find(v=>typeof v==='string'&&v.trim());
           const reason=sourcingEvidence ? sourcingEvidence.trim().slice(0,280) : 'Noch kein belegter Schnäppchen-Grund. Einkaufspreis, Vergleichsmarkt und Abverkauf müssen erst geprüft werden.';
           const actions=[['WATCH','👁 Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
           return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
-            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p></div>'+
+            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
             '<span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">Fund · ungeprüft</span></div>'+
             '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
@@ -2086,6 +2089,10 @@ body.albert-account-open .albert-auth-panel{display:block!important}
         const actionLabel = {WATCH:'Beobachten',DEEP_DIVE:'Marktprüfung',LEARN:'Erfahrung',REJECT:'Abgelehnt',SOFORT:'Neu',INBOX:'Neu'}[currentAction];
 
         const offerUrl = safeUrl(deal.offer_url);
+        const supplierName = String(deal.supplier_name || '').trim();
+        const platformDomain = offerUrl ? (() => { try { const host = new URL(offerUrl).hostname.replace(/^www[.]/, ''); return host === 'vertexaisearch.cloud.google.com' ? '' : host; } catch { return ''; } })() : '';
+        const supplierHeaderLine = '<div class="mt-1 text-xs text-slate-600"><span class="font-semibold">Anbieter: </span>' + escapeHtml(supplierName || 'Nicht bekannt') + (platformDomain ? ' <span class="text-slate-400">· Plattform: ' + escapeHtml(platformDomain) + '</span>' : '') + (offerUrl ? ' <a href="' + offerUrl + '" target="_blank" rel="noopener noreferrer" class="text-cyan-700 hover:underline">Angebot ↗</a>' : '') + '</div>';
+
 
         const offerLink = offerUrl
           ? `
@@ -2117,6 +2124,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                   <span>${escapeHtml(categoryName(deal))}</span>
                   <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
                 </div>
+                ${supplierHeaderLine}
               </div>
               <div class="deal-header-actions">
                 <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
