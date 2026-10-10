@@ -1592,6 +1592,35 @@
       const target=card.querySelector('[data-division-section="'+section+'"]');
       if(target){target.scrollIntoView({behavior:'smooth',block:'start'});target.focus({preventScroll:true});}
     });
+    const simpleCalcKey=id=>'albert:simple-calc:v1:'+id;
+    function updateSimpleCalc(section){
+      const num=v=>v!==''&&v!=null&&Number.isFinite(Number(v))?Number(v):null;
+      const market=num(section.dataset.market),ek=num(section.dataset.ek);
+      const fields=Object.fromEntries([...section.querySelectorAll('[data-simple-field]')].map(el=>[el.dataset.simpleField,num(el.value)]));
+      const fmt=n=>n.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+      const vk=market===null?null:market*0.8;
+      section.querySelector('[data-calc-market]').textContent=market===null?'—':fmt(market);
+      section.querySelector('[data-calc-vk]').textContent=vk===null?'—':fmt(vk);
+      section.querySelector('[data-calc-ek]').textContent=ek===null?'—':fmt(ek);
+      const result=section.querySelector('[data-calc-result]'),note=section.querySelector('[data-calc-note]');
+      const complete=section.dataset.blocked!=='true'&&vk!==null&&ek!==null&&Object.values(fields).every(v=>v!==null&&v>=0)&&fields.marketing<=100;
+      if(!complete){result.textContent='—';result.className='text-slate-500';note.textContent='Unvollständig: Marktpreis, EK oder Kosten fehlen.';return;}
+      const value=vk-ek-vk*fields.marketing/100-fields.logistics-fields.other;
+      result.textContent=(value>0?'+':'')+fmt(value);result.className=value>=0?'text-emerald-700':'text-rose-700';
+      note.textContent='Vorläufige Szenariorechnung mit unverifiziertem KI-Artikelpreis. Brutto-/Netto-Basis, Steuern und weitere Kosten nicht geklärt. Keine Kaufentscheidung.';
+    }
+    function restoreSimpleCalc(){
+      document.querySelectorAll('[data-simple-calc]').forEach(section=>{
+        try{const v=JSON.parse(localStorage.getItem(simpleCalcKey(section.dataset.simpleCalc))||'null');if(v)section.querySelectorAll('[data-simple-field]').forEach(el=>{if(Object.prototype.hasOwnProperty.call(v,el.dataset.simpleField))el.value=v[el.dataset.simpleField];});}catch(_){}
+        updateSimpleCalc(section);
+      });
+    }
+    document.getElementById('deals-container').addEventListener('input',event=>{
+      const field=event.target.closest('[data-simple-field]');if(!field)return;const section=field.closest('[data-simple-calc]');if(!section)return;
+      const values=Object.fromEntries([...section.querySelectorAll('[data-simple-field]')].map(el=>[el.dataset.simpleField,el.value]));
+      try{localStorage.setItem(simpleCalcKey(section.dataset.simpleCalc),JSON.stringify(values));}catch(_){}
+      updateSimpleCalc(section);
+    });
     // Vorläufige, lokale Einkäuferannahmen; bewusst keine serverseitige Speicherung ohne sichere Zugriffsregeln.
     const returnScenarioKey = id => 'albert:return-scenario:v1:' + id;
     document.getElementById('deals-container').addEventListener('input', event => {
@@ -2263,98 +2292,14 @@
 
                 </div>
 
-                <div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">${quantityExcluded ? "X · Gesperrt: Menge fehlt oder Posten ausgeschlossen" : hasVerifiedMarket ? "Verifizierter B2C-Gesamtpreis · keine Vollkostenrechnung" : "Gesperrt · kein verifizierter B2C-Gesamtpreis"}</p></div>
-                <div class="space-y-2 text-xs">
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      B2C-Gesamtpreis · verifiziert
-                    </span>
-
-                    <span class="mono text-[#1d1d1f]">
-                      ${avgMarket > 0
-                        && !quantityExcluded ? avgMarket.toFixed(2) + ' €'
-                        : '—'}
-                    </span>
-
-                  </div>
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      Differenz
-                    </span>
-
-                    <span class="mono ${
-                      absoluteMargin !== null && absoluteMargin >= 0
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
-                    } font-medium">
-
-                      ${
-                        absoluteMargin !== null
-                          ? (absoluteMargin >= 0 ? '+' : '') +
-                            absoluteMargin.toFixed(2) + ' €'
-                          : '—'
-                      }
-
-                    </span>
-
-                  </div>
-
-                  <div class="flex justify-between gap-2">
-
-                    <span class="text-slate-400">
-                      Spanne
-                    </span>
-
-                    <span class="mono ${
-                      percentageMargin !== null && percentageMargin >= 0
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
-                    } font-medium">
-
-                      ${
-                        percentageMargin !== null
-                          ? (percentageMargin >= 0 ? '+' : '') +
-                            percentageMargin.toFixed(1) + '%'
-                          : '—'
-                      }
-
-                    </span>
-
-                  </div>
-
-                </div>
-
-                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-2" aria-label="Konservative Vorprüfung">
-                  <div class="font-semibold text-slate-700">Konservative Vorprüfung</div>
-                  <div class="flex justify-between gap-2"><span>VK · 20 % unter B2C inkl. Versand</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.8).toFixed(2)+' €' : '—'}</strong></div>
-                  <div class="flex justify-between gap-2"><span>Marketing · 20 % vom VK</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.16).toFixed(2)+' €' : '—'}</strong></div>
-                  <div class="flex justify-between gap-2"><span>Rest vor EK und weiteren Kosten</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.64).toFixed(2)+' €' : '—'}</strong></div>
-                  <p class="text-[10px] text-slate-500 leading-relaxed">Nur bei verifiziertem B2C-Gesamtpreis. Kein Gewinn und kein MAX-EK: Einkaufspreisbasis, Versand, Gebühren, Retouren, Steuern und weitere Vollkosten sind hier nicht berücksichtigt.</p>
-                </div>
-
-
-              <details class="rounded-lg border border-slate-200 p-3 text-xs" data-return-scenario="${dealId}">
-                <summary class="cursor-pointer font-semibold text-slate-700">Retouren-Szenario · Einkäuferannahme</summary>
-                <p class="mt-2 text-slate-500">Keine KI-Prognose. Ohne Anmeldung lokal, mit Einkäufer-Login als eigene Revisionen in Supabase gespeichert.</p>
-                <div class="grid grid-cols-2 gap-2 mt-3">
-                  <label>Retourenquote %<input type="number" min="0" max="100" step="0.5" inputmode="decimal" data-return-field="rate" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 8"></label>
-                  <label>Kosten je Retoure €<input type="number" min="0" step="0.01" inputmode="decimal" data-return-field="cost" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 12"></label>
-                </div>
-                <p class="mt-2 text-[10px] text-slate-500" data-return-save-status>Browser-Speicherung aktiv · Server-Speicherung nur nach Anmeldung und Eingabeabschluss.</p>
-                <div class="grid grid-cols-2 gap-2 mt-3">
-                  <label>Endkundenversand / Stück €<input type="number" min="0" step="0.01" data-return-field="shipping" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
-                  <label>Plattformgebühren / Stück €<input type="number" min="0" step="0.01" data-return-field="fees" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
-                  <label>Handling / Stück €<input type="number" min="0" step="0.01" data-return-field="handling" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
-                  <label>Sonstige Kosten / Stück €<input type="number" min="0" step="0.01" data-return-field="other" class="block w-full mt-1 rounded border p-2" placeholder="Eingeben"></label>
-                </div>
-                <p class="mt-2 text-[10px] text-slate-500">Vollkosten erst mit bestätigter Netto-/Brutto-Basis, Steuern und Einkaufskosten möglich. Fehlende Felder sind nicht null.</p>
-                <div class="mt-2 text-slate-700" data-return-result>Beide Werte eingeben, um erwartete Retourenkosten zu berechnen.</div>
-              </details>
-              <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
+<div><h3 class="division-title">Wirtschaftlichkeit</h3><p class="division-subtitle">Deine Kosten · vorläufige Rechnung</p></div>
+<div data-simple-calc="${dealId}" data-market="${(()=>{const p=(currentOracle?.shopping_results||[]).map(x=>Number(x.indicative_article_price)).filter(x=>Number.isFinite(x)&&x>0);return p.length?Math.min(...p):""})()}" data-ek="${hasPurchasePrice?purchasePrice:""}" data-blocked="${quantityExcluded}">
+<div class="space-y-2 text-xs"><div>KI-Marktpreis: <strong data-calc-market>—</strong></div><div>Unser VK (−20 %): <strong data-calc-vk>—</strong></div><div>EK / Stück: <strong data-calc-ek>—</strong></div></div>
+<div class="mt-3 space-y-2 text-xs">
+<label class="flex justify-between items-center gap-2">Marketing (%) <input data-simple-field="marketing" type="number" min="0" max="100" step="0.5" value="20" class="w-24 rounded border p-2 text-right"></label>
+<label class="flex justify-between items-center gap-2">Logistik (€) <input data-simple-field="logistics" type="number" min="0" step="0.01" placeholder="Eingeben" class="w-24 rounded border p-2 text-right"></label>
+<label class="flex justify-between items-center gap-2">Sonstige Kosten (€) <input data-simple-field="other" type="number" min="0" step="0.01" placeholder="Eingeben" class="w-24 rounded border p-2 text-right"></label>
+</div><div class="mt-3 rounded-lg bg-slate-50 border p-3 text-xs"><div class="flex justify-between font-semibold gap-2"><span>Vorläufiges Ergebnis / Stück</span><span data-calc-result>—</span></div><p class="mt-2 text-[10px] text-slate-500" data-calc-note>Bitte Kosten eintragen.</p></div></div>
               </div>
 
 
@@ -2550,6 +2495,7 @@
 
       }).join('');
 
+      restoreSimpleCalc();
       // Offene Deal-Kacheln nach jedem Re-Render wiederherstellen.
       for (const deal of visibleDeals) {
         if (isDealExpanded(deal.id, activeDealView)) {
