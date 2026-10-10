@@ -468,6 +468,11 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-sofort-highlight{border:2px solid #24a1d6!important;box-shadow:0 0 0 2px rgba(36,161,214,.07),0 2px 8px rgba(15,23,42,.05)}
     .deal-sofort-highlight:hover{box-shadow:0 0 0 3px rgba(36,161,214,.12),0 6px 16px rgba(15,23,42,.08)}
 
+/* Seitenwechsel: explizite Sichtbarkeit statt konkurrierender Grid-/Hidden-Regeln. */
+#list-scanner-page.hidden,#albert-deals-layout.hidden{display:none!important}
+#deal-navigation .deal-view[aria-current="page"]{background:#eef2f7!important;color:#0f172a!important;font-weight:650!important}
+#list-scanner-nav[aria-expanded="true"]{background:#eaf4f9!important}
+
 /* Professional navigation: restrained controls, consistent active states */
 #list-scanner-nav,.deal-view{border-radius:8px!important;min-height:40px;transition:background-color .14s,color .14s,border-color .14s!important}
 #list-scanner-nav{margin-top:0!important;margin-bottom:14px!important;font-weight:600!important}
@@ -735,16 +740,21 @@ body.albert-account-open .albert-auth-panel{display:block!important}
   <script src="scanner-intelligence.js" defer></script>\n  <script>
 
 
-function openListScanner(){
-  document.getElementById('list-scanner-page')?.classList.remove('hidden');
-  document.getElementById('albert-deals-layout')?.classList.add('hidden');
-  const btn=document.getElementById('list-scanner-nav');btn?.setAttribute('aria-expanded','true');btn?.classList.add('bg-cyan-50','text-cyan-800');
+function setAlbertPage(page){
+  const scanner=page==='scanner';
+  document.getElementById('list-scanner-page')?.classList.toggle('hidden',!scanner);
+  document.getElementById('albert-deals-layout')?.classList.toggle('hidden',scanner);
+  const btn=document.getElementById('list-scanner-nav');
+  btn?.setAttribute('aria-expanded',String(scanner));
+  btn?.setAttribute('aria-current',scanner?'page':'false');
+  btn?.classList.toggle('bg-cyan-50',scanner);
+  btn?.classList.toggle('text-cyan-800',scanner);
+  document.querySelectorAll('#deal-navigation [data-view]').forEach(item=>{
+    item.setAttribute('aria-current',!scanner&&item.dataset.view===activeDealView?'page':'false');
+  });
 }
-function closeListScanner(){
-  document.getElementById('list-scanner-page')?.classList.add('hidden');
-  document.getElementById('albert-deals-layout')?.classList.remove('hidden');
-  const btn=document.getElementById('list-scanner-nav');btn?.setAttribute('aria-expanded','false');btn?.classList.remove('bg-cyan-50','text-cyan-800');
-}
+function openListScanner(){setAlbertPage('scanner');}
+function closeListScanner(){setAlbertPage('deals');}
 // CSV is kept in memory only. No database writes or remote AI calls.
 let scannerData=null;
 function parseScannerCsv(raw){
@@ -1777,6 +1787,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       const button = event.target.closest('[data-view]');
       if (!button) return;
       const nextView = button.dataset.view;
+      if(!Object.prototype.hasOwnProperty.call(dealViewNames,nextView))return;
       // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
       dealExpansion.clear();
       activeDealView = nextView;
