@@ -37,3 +37,27 @@ test("orchestrator uses one injected request and passes origin", async () => {
 test("missing credentials fail without a network request", async () => {
   await assert.rejects(() => execute({}, { supabaseUrl: "", supabaseKey: "" }));
 });
+
+test("multiple saved deals are counted individually", () => {
+  const result = classify({ status: "new_saved", saved_deals: [
+    { id: 11 }, { id: 12 }, { product_name: "without id" }
+  ], stats: { candidates: 3, saved: 2 } });
+  assert.equal(result.count, 2);
+  assert.equal(result.deals.length, 2);
+  assert.equal(result.stats.candidates, 3);
+});
+test("no new results are not confused with errors", () => {
+  const result = classify({ status: "no_new_deals", saved_deals: [], stats: { duplicates: 6 } });
+  assert.equal(result.count, 0);
+  assert.equal(result.stats.duplicates, 6);
+});
+test("research request includes service bearer authorization", async () => {
+  const { discover } = require("../divisions/radar/sofort-jagd/discovery");
+  await discover({ query: "test" }, {
+    supabaseUrl: "https://example.org", supabaseKey: "example-key",
+    fetch: async (_url, options) => {
+      assert.equal(options.headers.Authorization, "Bearer example-key");
+      return { ok: true, json: async () => ({ success: true, status: "no_new_deals" }) };
+    }
+  });
+});
