@@ -30,7 +30,7 @@ function candidatesFrom(raw: string): Candidate[] {
   }
   const arr = Array.isArray(value) ? value : Array.isArray(value?.candidates) ? value.candidates
     : value?.offer_url ? [value] : [];
-  return arr.filter(x => x && typeof x === "object").slice(0, 12);
+  return arr.filter(x => x && typeof x === "object").slice(0, 5);
 }
 // URLs are syntactically checked, but not fetched from the server.
 // Server-side arbitrary URL fetches would create an SSRF risk.
@@ -60,17 +60,22 @@ serve(async req => {
     // One grounded model call; no unbounded retries or surprise cost multiplication.
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
-      contents: `Du bist RADAR, eine B2B-Beschaffungsrecherche für deutschen B2C-Handel.
+      contents: `Du bist RADAR, ein erfahrener kategorieunabhängiger B2B-Schnäppchenjäger für den deutschen B2C-Handel.
 Auftrag: ${query}
-Suche mit Google Search 6 bis 10 UNTERSCHIEDLICHE, konkrete öffentlich auffindbare B2B-Angebote in Europa.
-Suche Restposten, Überbestände, Liquidationen, Sortimentswechsel und ungewöhnliche
-langweilige Kategorien (z.B. Büro-Verbrauchsmaterial, Ersatzteile, Betriebsmittel).
-Diversifiziere Quellen und Kategorien; keine erfundenen Produkte, Preise oder Links.
-Kein B2C-Marktpreis und keine Wirtschaftlichkeit erfinden. Unbekannte Werte null.
-Antworte ausschließlich als JSON-Objekt {"candidates":[{"product_name":null,
-"brand":null,"ean_gtin":null,"mpn":null,"purchase_price":null,"currency":"EUR",
-"quantity":null,"offer_url":null,"market_prices":[],"category":null,"sourcing_signal":null}]}.
-Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
+ZIEL: Entdecke 3–5 unterschiedliche KONKRETE, öffentlich auffindbare B2B-Warenangebote mit nachvollziehbarer URL. Suche nach Verkäuferdruck, nicht nur nach Produktnamen.
+SUCHE BREIT IN MEHREREN SUCHRICHTUNGEN:
+1. Lagerüberhang, Overstock, Sortimentswechsel, Auftragsstorno und Distributor-Abverkauf.
+2. Insolvenzverwertung, Geschäftsaufgabe, Lagerauflösung und Auktionen.
+3. Großhändler, Hersteller, Liquidatoren und wenig sichtbare lokale Anbieter.
+4. Lagerlisten/PDFs, Sonderpreislisten und schlecht präsentierte Bestände.
+5. Berücksichtige auch ungewöhnliche Kategorien wie Bürobedarf oder Ersatzteile.
+6. Nutze passende lokale Suchbegriffe aus Deutschland und höchstens einem weiteren europäischen Land je Lauf.
+Variiere die Suchanfragen aktiv; gib nicht nur dieselben bekannten Portale aus. Bevorzuge konkrete Angebotsseiten gegenüber Startseiten, Branchenverzeichnissen oder reinen Informationsseiten.
+Ein Angebot ist NICHT automatisch ein Schnäppchen: Keine erfundenen Marktpreise, EK, Mengen, EAN, Verfügbarkeit oder Begründungen.
+Unterscheide price_type: fixed, auction_start, negotiable oder unknown. Unterscheide price_scope: unit, lot oder unknown. Gib quantity_unit als belegte Einheit (Stück, Boxen, Kartons, Paletten, m², kg) an. Startgebote sind niemals Festpreise. Die Angebotsmenge muss ausdrücklich belegt sein. Falls nicht auffindbar, quantity:null (kein erfundener Wert).
+Für jeden Kandidaten gib sourcing_signal als EINEN präzisen, vorsichtigen Satz: Welche KONKRETE Angebotsinformation deutet auf eine Beschaffungschance hin? Z.B. belegte Lagerauflösung, ungewöhnliche Menge, klar ausgewiesener Abverkauf. Wenn nicht erkennbar: null. Keine UVP-Vergleiche ohne aktuelle Marktbelege.
+Antworte ausschließlich mit JSON: {"candidates":[{"product_name":null,"brand":null,"ean_gtin":null,"mpn":null,"purchase_price":null,"currency":"EUR","quantity":null,"quantity_unit":null,"price_type":"unknown","price_scope":"unknown","offer_url":null,"market_prices":[],"category":null,"sourcing_signal":null}]}.
+Jeder Eintrag benötigt eine konkrete https-Angebots-URL. Keine erfundenen Links.`,
       config: { tools: [{ googleSearch: {} }] }
     });
     if (!response.text) throw new Error("RADAR: Leere Modellantwort.");
@@ -82,6 +87,12 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       const offerUrl = validOfferUrl(candidate.offer_url);
       const productName = text(candidate.product_name).slice(0, 255);
       if (!offerUrl || !productName || seen.has(offerUrl)) { stats.invalid++; continue; }
+      // Harte Einkaufsregel: ohne explizite positive ganzzahlige Postenmenge kein Deal.
+      // Fehlende Mengen niemals schätzen oder aus Texten ableiten.
+      if (typeof candidate.quantity !== "number" || !Number.isSafeInteger(candidate.quantity) || candidate.quantity <= 0) {
+        stats.invalid++;
+        continue;
+      }
       seen.add(offerUrl);
       const urlState = "unverified"; // Human/grounded verification is required.
       stats.urlUnverified++;
@@ -116,16 +127,14 @@ Jeder Eintrag benötigt eine direkte konkrete Angebots-URL, keine Startseite.`,
       }
       const purchase = typeof candidate.purchase_price === "number" && candidate.purchase_price >= 0
         ? candidate.purchase_price : null;
-      const quantity = typeof candidate.quantity === "number" && candidate.quantity > 0
-        ? Math.floor(candidate.quantity) : null;
+      const quantity = candidate.quantity as number;
       const row = {
         product_name: productName, brand: text(candidate.brand) || null,
         ean_gtin: text(candidate.ean_gtin) || null, mpn: text(candidate.mpn) || null,
         purchase_price: purchase, quantity, currency: text(candidate.currency) || "EUR",
         offer_url: offerUrl, category: text(candidate.category) || "Allgemein",
         market_prices: [], decision_grade: "B",
-        decision_reason: "RADAR-Kandidat: Identität, EK, DE-Markt, Nachfrage und Vollkosten noch nicht verifiziert." +
-          (urlState === "unverified" ? " URL technisch nicht verifizierbar." : ""),
+        decision_reason: "RADAR-Hinweis (ungeprüft): " + text(candidate.sourcing_signal).slice(0,250) + " · Preisart: " + text(candidate.price_type) + " · Preiseinheit: " + text(candidate.price_scope) + " · Mengeneinheit: " + text(candidate.quantity_unit) + " · Nicht verifiziert.",
         bucket: "WATCH", research_run_id: runId, hunt_origin: origin,
         discovered_at: new Date().toISOString()
       };
