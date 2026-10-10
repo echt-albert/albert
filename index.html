@@ -404,6 +404,11 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     article.deal-workspace .deal-accordion-body .albert-analysis-panel,
     article.deal-workspace .deal-accordion-body .albert-analysis-verdict{border-color:#e2e8f0!important}
 
+    /* Detailakte: redundante vier Kennzahlen und grüne B2C-Zusammenfassung entfernen.
+       Kompakte Deal-Karte und zugrundeliegende Marktdaten bleiben unverändert. */
+    article.deal-workspace:not(.deal-compact) .deal-decision-overview,
+    article.deal-workspace:not(.deal-compact) .deal-b2c-market{display:none!important}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
