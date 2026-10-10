@@ -1995,7 +1995,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       const prediction=!score&&deal?predictBuyerInterest(deal):null;
       const hint=prediction?'<span class="ml-auto text-[10px] text-slate-400" title="Unverbindliche Schätzung aus ähnlichen bewerteten Deals, kein wirtschaftliches Urteil">Albert vermutet: '+escapeHtml(prediction.stars.toFixed(1))+'/5 · unsicher</span>':'';
       return '<div class="mt-3 border-t border-slate-100 pt-3" data-star-rating="'+escapeHtml(id)+'"><div class="flex items-center gap-2 flex-wrap"><span class="text-xs text-slate-500">Deine Bewertung</span><div class="flex gap-1" role="group" aria-label="Deal mit 1 bis 5 Sternen bewerten">'+
-        [1,2,3,4,5].map(n=>'<button type="button" data-star-value="'+n+'" data-star-id="'+escapeHtml(id)+'" aria-label="'+n+' Sterne" aria-pressed="'+(score===n)+'" class="text-2xl leading-none hover:scale-110 transition-transform '+(n<=score?'text-amber-500':'text-slate-300')+'">★</button>').join('')+'</div></div>'+
+        [1,2,3,4,5].map(n=>'<button type="button" data-star-value="'+n+'" data-star-id="'+escapeHtml(id)+'" aria-label="'+n+' Sterne" aria-pressed="'+(score===n)+'" class="text-2xl leading-none hover:scale-110 transition-transform '+(n<=score?'text-amber-500':'text-slate-300')+'">★</button>').join('')+'</div>'+hint+'</div>'+
         (score?'<p class="mt-1 text-[11px] text-slate-500">Warum? Freiwillig · Mehrfachauswahl</p>':'')+chips+'</div>';
     }
     function refreshRatingWidget(id) {
