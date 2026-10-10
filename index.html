@@ -1081,12 +1081,24 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         // lokale Indikation erhalten und niemals fälschlich als gespeichert melden.
         let persisted=data.persisted===true;
         if(!persisted){
-          try { localStorage.setItem(oracleLocalKey(dealId),JSON.stringify(data.report)); } catch (_) {}
+          const saved=await supabaseClient.from('discoveries')
+            .update({market_deep_dive:data.report})
+            .eq('id',deal.id)
+            .select('id')
+            .maybeSingle();
+          persisted=!saved.error&&Boolean(saved.data?.id);
+          if(!persisted){
+            console.warn('ORACLE: Deal-Speicherung fehlgeschlagen',deal.id,saved.error?.message||'Keine aktualisierte Zeile');
+            try { localStorage.setItem(oracleLocalKey(dealId),JSON.stringify(data.report)); } catch (_) {}
+            showStatus('ORACLE: Händlerpreise gefunden, aber nicht dauerhaft am Deal gespeichert.',true);
+          }else{
+            try { localStorage.removeItem(oracleLocalKey(dealId)); } catch (_) {}
+          }
         }
         const count=(data.report?.shopping_results||[]).filter(row=>row.merchant&&safeUrl(row.url)&&row.display_price).slice(0,3).length;
         const traces=(data.report?.diagnostics||[]).map(x=>x.engine+': '+(x.hits??'?')+' Treffer, '+(x.accepted??0)+' übernommen'+(x.error?' ('+x.error+')':'')).join(' | ');
         console.info('ORACLE Suchdiagnose',dealId,traces,data.report?.warnings||[]);
-        finishAlbertActivity('oracle-'+id,'ORACLE',count ? count+' Händlerpreise gefunden.' : 'Keine Händlerpreise gefunden.',false,count===0);
+        finishAlbertActivity('oracle-'+id,'ORACLE',count ? count+' Händlerpreise gefunden'+(persisted?' und am Deal gespeichert.':' (Speicherung fehlgeschlagen).') : 'Keine Händlerpreise gefunden.',!persisted,count===0);
       }catch(e){
         finishAlbertActivity('oracle-'+id,'ORACLE',e.message||String(e),true);
         showStatus('ORACLE: '+(e.message||e),true);
