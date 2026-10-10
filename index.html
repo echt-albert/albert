@@ -1539,6 +1539,48 @@
       const target=card.querySelector('[data-division-section="'+section+'"]');
       if(target){target.scrollIntoView({behavior:'smooth',block:'start'});target.focus({preventScroll:true});}
     });
+    // Vorläufige, lokale Einkäuferannahmen; bewusst keine serverseitige Speicherung ohne sichere Zugriffsregeln.
+    const returnScenarioKey = id => 'albert:return-scenario:v1:' + id;
+    document.getElementById('deals-container').addEventListener('input', event => {
+      const input = event.target.closest('[data-return-field]');
+      if (!input) return;
+      const section = input.closest('[data-return-scenario]');
+      if (!section) return;
+      const id = section.dataset.returnScenario;
+      const values = Object.fromEntries([...section.querySelectorAll('[data-return-field]')].map(el => [el.dataset.returnField, el.value]));
+      try { localStorage.setItem(returnScenarioKey(id), JSON.stringify(values)); } catch (_) {}
+      updateReturnScenario(section);
+    });
+    function updateReturnScenario(section) {
+      const rateRaw = section.querySelector('[data-return-field="rate"]').value;
+      const costRaw = section.querySelector('[data-return-field="cost"]').value;
+      const result = section.querySelector('[data-return-result]');
+      const rate = Number(rateRaw), cost = Number(costRaw);
+      if (rateRaw === '' || costRaw === '' || !Number.isFinite(rate) || !Number.isFinite(cost) || rate < 0 || rate > 100 || cost < 0) {
+        result.textContent = 'Gültige Retourenquote (0–100 %) und Kosten je Retoure eingeben.';
+        return;
+      }
+      const deal = window.albertDealsById?.get(String(section.dataset.returnScenario));
+      const qty = Number(deal?.quantity);
+      if (!Number.isSafeInteger(qty) || qty <= 0 || dealQuantityBlocked(deal)) {
+        result.textContent = 'Keine Berechnung: Menge fehlt oder Posten ausgeschlossen.';
+        return;
+      }
+      const expected = qty * rate / 100 * cost;
+      result.textContent = 'Erwartete Retourenkosten für den Posten: ' + expected.toLocaleString('de-DE',{style:'currency',currency:'EUR'}) + ' · Annahme, noch nicht in QUANTUM-Vollkosten übernommen.';
+    }
+    document.getElementById('deals-container').addEventListener('toggle', event => {
+      const section = event.target.closest('[data-return-scenario]');
+      if (!section || !section.open || section.dataset.loaded === 'yes') return;
+      section.dataset.loaded = 'yes';
+      try {
+        const values = JSON.parse(localStorage.getItem(returnScenarioKey(section.dataset.returnScenario)) || '{}');
+        for (const field of ['rate','cost']) {
+          if (values[field] !== undefined) section.querySelector('[data-return-field="'+field+'"]').value = values[field];
+        }
+      } catch (_) {}
+      updateReturnScenario(section);
+    }, true);
     async function fetchDeals() {
 
       const container =
@@ -2117,6 +2159,15 @@
                 </div>
 
 
+              <details class="rounded-lg border border-slate-200 p-3 text-xs" data-return-scenario="${dealId}">
+                <summary class="cursor-pointer font-semibold text-slate-700">Retouren-Szenario · Einkäuferannahme</summary>
+                <p class="mt-2 text-slate-500">Noch keine KI-Prognose. Werte selbst eingeben; Speicherung vorläufig nur in diesem Browser, nicht in Alberts Entscheidungsgedächtnis.</p>
+                <div class="grid grid-cols-2 gap-2 mt-3">
+                  <label>Retourenquote %<input type="number" min="0" max="100" step="0.5" inputmode="decimal" data-return-field="rate" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 8"></label>
+                  <label>Kosten je Retoure €<input type="number" min="0" step="0.01" inputmode="decimal" data-return-field="cost" class="block w-full mt-1 rounded border p-2" placeholder="z. B. 12"></label>
+                </div>
+                <div class="mt-2 text-slate-700" data-return-result>Beide Werte eingeben, um erwartete Retourenkosten zu berechnen.</div>
+              </details>
               <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
               </div>
 
