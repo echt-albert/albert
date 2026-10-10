@@ -1968,6 +1968,37 @@ body.albert-account-open .albert-auth-panel{display:block!important}
       document.getElementById('grade-filters').innerHTML =
         gradeButton('Alle', categoryDeals.length, !activeGradeFilter, '__ALL__') +
         grades.map(grade => gradeButton(grade, gradeCounts.get(grade), activeGradeFilter === grade, grade)).join('');
+      // Alberts Spürsinn: Muster in bereits gespeicherten Deals, ohne KI-Kosten.
+      const sourceHost = deal => {
+        const url = safeUrl(deal.offer_url);
+        if (!url) return '';
+        try {
+          const host = new URL(url).hostname.toLowerCase().replace(/^www[.]/, '');
+          return host === 'vertexaisearch.cloud.google.com' ? '' : host;
+        } catch { return ''; }
+      };
+      const sourceCounts = new Map();
+      const supplierCounts = new Map();
+      const discoveryNotes = new Map();
+      const chronologicalDeals = [...(deals || [])].sort((a,b) => String(a.discovered_at||'').localeCompare(String(b.discovered_at||'')));
+      for (const candidate of chronologicalDeals) {
+        const host = sourceHost(candidate);
+        const supplier = String(candidate.supplier_name||'').trim();
+        const supplierKey = supplier && !/^(unbekannt|nicht bekannt|nicht angegeben|n\/a)$/i.test(supplier) ? supplier.toLocaleLowerCase('de-DE') : '';
+        const previousSupplier = supplierKey ? (supplierCounts.get(supplierKey)||0) : 0;
+        const previousHost = host ? (sourceCounts.get(host)||0) : 0;
+        let note = '';
+        if (previousSupplier > 0) note = '🧠 Albert erinnert sich: Dieser Anbieter ist bereits bei '+previousSupplier+' weiteren Funden aufgetaucht.';
+        else if (host && previousHost === 0) note = '🔎 Alberts Spürsinn: Neue Plattform im Fundbestand – '+host+'.';
+        else if (host && previousHost > 0) note = '🔎 Alberts Spürsinn: '+previousHost+' weitere Funde von '+host+' sind bereits bekannt.';
+        if (note) discoveryNotes.set(String(candidate.id), note);
+        if (host) sourceCounts.set(host, previousHost+1);
+        if (supplierKey) supplierCounts.set(supplierKey, previousSupplier+1);
+      }
+      const spuersinnHtml = deal => {
+        const note = discoveryNotes.get(String(deal.id));
+        return note ? '<div class="mt-2 rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-slate-700">'+escapeHtml(note)+'</div>' : '';
+      };
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
       const viewTitle = dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span></div>';
@@ -2008,7 +2039,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
           const actions=[['WATCH','👁 Watch'],['DEEP_DIVE','📊 Deep Dive Market'],['LEARN','🧠 Langzeithirn'],['REJECT','✕ Ablehnen']];
           return '<article id="deal-card-'+id+'" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">'+
             '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><h2 class="text-base font-semibold text-slate-900">'+escapeHtml(deal.product_name||'Produkt noch nicht identifiziert')+'</h2>'+
-            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+'</div>'+
+            '<p class="mt-1 text-xs text-slate-500">'+escapeHtml(identity||categoryName(deal))+'</p>'+supplierHeader+spuersinnHtml(deal)+'</div>'+
             '<span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">Fund · ungeprüft</span></div>'+
             '<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">'+
             '<div><span class="block text-[10px] text-slate-500">'+escapeHtml(priceTitle+priceSuffix)+'</span><strong>'+ (priceKnown?escapeHtml(price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(deal.currency||'EUR')):'Nicht angegeben')+'</strong></div>'+
@@ -2128,6 +2159,7 @@ body.albert-account-open .albert-auth-panel{display:block!important}
                   <button type="button" onclick="openCategoryEditor('${dealId}')" class="deal-category-edit" title="Kategorie ändern oder neu erstellen" aria-label="Kategorie bearbeiten">✎</button>
                 </div>
                 ${supplierHeaderLine}
+                ${spuersinnHtml(deal)}
               </div>
               <div class="deal-header-actions">
                 <span class="deal-grade-compact ${['A','B','C','X'].includes(deal.decision_grade) ? 'deal-grade-'+deal.decision_grade.toLowerCase() : 'deal-grade-pending'}" title="Automatische Ersteinschätzung von Albert – nicht die endgültige Kaufentscheidung" aria-label="KI-Ersteinschätzung: ${['A','B','C','X'].includes(deal.decision_grade) ? escapeHtml(deal.decision_grade) : 'offen'}">
