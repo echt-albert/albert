@@ -1752,13 +1752,13 @@
             <!-- SIEBEN ABTEILUNGEN: in jeder Ansicht direkt erreichbar -->
             <nav class="deal-division-nav" aria-label="Abteilungen der Deal-Akte">
               ${[
-                ['radar','01','RADAR','Einkauf',Boolean(deal.offer_url)],
-                ['cipher','02','CIPHER','Identität',Boolean(deal.cipher_research?.checked_at)],
-                ['oracle','03','ORACLE','Markt',Boolean(deal.market_deep_dive?.checked_at)],
-                ['quantum','04','QUANTUM','Wirtschaft',Boolean(deal.quantum_calculation?.checked_at)],
-                ['verdict','05','VERDICT','Entscheidung',Boolean(deal.human_verdict?.verdict_grade)],
-                ['portrait','06','PRODUKT','Porträt',Boolean(deal.product_portrait)],
-                ['audience','07','ZIELGRUPPEN','Käufer',Boolean(deal.target_audience)]
+                ['radar','01','Einkauf','Bezugsquelle',Boolean(deal.offer_url)],
+                ['cipher','02','Identität','Produktprüfung',Boolean(deal.cipher_research?.checked_at)],
+                ['oracle','03','Markt','B2C-Markt',Boolean(deal.market_deep_dive?.checked_at)],
+                ['quantum','04','Kalkulation','Wirtschaftlichkeit',Boolean(deal.quantum_calculation?.checked_at)],
+                ['verdict','05','Entscheidung','Bewertung',Boolean(deal.human_verdict?.verdict_grade)],
+                ['portrait','06','Produkt','Porträt',Boolean(deal.product_portrait)],
+                ['audience','07','Käufer','Zielgruppe',Boolean(deal.target_audience)]
               ].map(([key,n,label,description,done])=>'<button type="button" class="deal-division-link" data-deal-division="'+key+'" data-deal-id="'+dealId+'" aria-label="'+n+' '+label+' öffnen"><span class="deal-division-index">'+n+' · '+(done?'●':'○')+'</span><strong>'+label+'</strong><small>'+description+'</small></button>').join('')}
             </nav>
 
@@ -1812,7 +1812,7 @@
               <span class="font-semibold text-amber-900">${escapeHtml(actionLabel)}</span>
               <span>EK: ${hasPurchasePrice ? escapeHtml(purchasePrice.toFixed(2)) + ' €' : 'unbekannt'}</span>
               <span>Urteil: ${grade}</span>
-              <span class="font-semibold text-amber-900">04 · QUANTUM</span>
+              <span class="font-semibold text-amber-900">04 · Kalkulation</span>
               <span>Ø Markt: ${avgMarket > 0 ? avgMarket.toFixed(2) + ' €' : '—'}</span>
               <span>Differenz: ${absoluteMargin !== null ? absoluteMargin.toFixed(2) + ' €' : '—'}</span>
               ${latestFeedback?.comment ? `<span class="truncate max-w-[360px]" title="${escapeHtml(latestFeedback.comment)}">${escapeHtml(latestFeedback.comment)}</span>` : ''}
@@ -1833,7 +1833,7 @@
                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
 
                     <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-900 mono">
-                      01 · RADAR
+                      01 · Einkauf
                     </span>
 
                   </div>
@@ -1884,7 +1884,7 @@
                   <span class="w-2 h-2 rounded-full bg-slate-500"></span>
 
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-700 mono">
-                    02 · CIPHER
+                    02 · Identität
                   </span>
 
                 </div>
@@ -1948,7 +1948,7 @@
                   <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
 
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mono">
-                    03 · ORACLE
+                    03 · Markt
                   </span>
 
                 </div>
@@ -1985,7 +1985,7 @@
                   <span class="w-2 h-2 rounded-full bg-amber-500"></span>
 
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-900 mono">
-                    04 · QUANTUM
+                    04 · Kalkulation
                   </span>
 
                 </div>
@@ -2076,7 +2076,7 @@
                       <span class="w-2 h-2 rounded-full bg-purple-500"></span>
 
                       <span class="text-[10px] font-semibold uppercase tracking-wider text-purple-700 mono">
-                        05 · VERDICT
+                        05 · Entscheidung
                       </span>
 
                     </div>
@@ -2102,7 +2102,7 @@
               <div data-division-section="portrait" tabindex="-1" class="deal-division-section bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · PRODUKTPORTRÄT</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 mono">06 · Produkt</span>
                 </div>
                 <button type="button" class="ai-card-action mb-3 self-start rounded-lg border px-3 py-2 text-[11px] font-semibold text-emerald-800" data-ai-type="portrait" data-deal-id="${dealId}">Produktporträt erstellen</button>
                 <p id="product-portrait-${dealId}" class="text-[12px] leading-relaxed text-slate-700">${plainProductDescription(deal) ? escapeHtml(plainProductDescription(deal)) : '<span class="text-slate-400">Produktporträt noch nicht gestartet.</span>'}</p>
@@ -2120,7 +2120,7 @@
               <div data-division-section="audience" tabindex="-1" class="deal-division-section bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
                 <div class="flex items-center gap-2 mb-3">
                   <span class="w-2 h-2 rounded-full bg-violet-500"></span>
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · ZIELGRUPPEN</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-violet-800 mono">07 · Käufer</span>
                 </div>
                 <button type="button" class="ai-card-action mb-3 self-start rounded-lg border px-3 py-2 text-[11px] font-semibold text-violet-800" data-ai-type="audience" data-deal-id="${dealId}">Zielgruppen analysieren</button>
                 <div id="target-audience-${dealId}" class="space-y-3 text-[12px] leading-relaxed text-slate-700">
