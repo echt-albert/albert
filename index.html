@@ -2108,9 +2108,14 @@
 
                 </div>
 
-                <p class="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                  Rohvergleich vor Versand, Marketing und weiteren Kosten.
-                </p>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-2" aria-label="Konservative Vorprüfung">
+                  <div class="font-semibold text-slate-700">Konservative Vorprüfung</div>
+                  <div class="flex justify-between gap-2"><span>VK · 20 % unter B2C inkl. Versand</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.8).toFixed(2)+' €' : '—'}</strong></div>
+                  <div class="flex justify-between gap-2"><span>Marketing · 20 % vom VK</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.16).toFixed(2)+' €' : '—'}</strong></div>
+                  <div class="flex justify-between gap-2"><span>Rest vor EK und weiteren Kosten</span><strong>${!quantityExcluded && b2cLowest != null ? (b2cLowest*0.64).toFixed(2)+' €' : '—'}</strong></div>
+                  <p class="text-[10px] text-slate-500 leading-relaxed">Nur bei verifiziertem B2C-Gesamtpreis. Kein Gewinn und kein MAX-EK: Einkaufspreisbasis, Versand, Gebühren, Retouren, Steuern und weitere Vollkosten sind hier nicht berücksichtigt.</p>
+                </div>
+
 
               <button type="button" data-deal-id="${dealId}" class="division-action deal-guidance-action" ${quantityExcluded ? 'disabled title="X-Ausschluss: Postenmenge fehlt oder Deal ausgeschlossen"' : ""}>Kalkulation</button>
               </div>
