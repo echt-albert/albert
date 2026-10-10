@@ -1,6 +1,6 @@
 -- Simulierte CSV-Daten strikt von verifizierten Marktinformationen trennen.
 create table if not exists public.scanner_test_values (
- discovery_id uuid primary key references public.discoveries(id) on delete cascade,
+ discovery_id bigint primary key references public.discoveries(id) on delete cascade,
  values_json jsonb not null default '{}'::jsonb,
  created_at timestamptz not null default now()
 );
