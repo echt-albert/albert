@@ -1191,6 +1191,8 @@
       button.addEventListener('click', retry, { once: true });
       target.append(note, button);
     }
+    const portraitRegenerate = new Set();
+    const audienceRegenerate = new Set();
     const portraitRequests = new Map();
     const portraitCache = new Map();
     async function loadProductPortrait(id) {
@@ -1204,7 +1206,7 @@
       target.textContent = 'Albert recherchiert die wichtigsten Merkmale dieses Modells …';
       try {
         const { data, error } = await supabaseClient.functions.invoke('albert-product-portrait', {
-          body: { deal_id: key }
+          body: { deal_id: key, force: portraitRegenerate.has(key) }
         });
         if (error) throw error;
         const current = document.getElementById('product-portrait-' + key);
@@ -1241,7 +1243,7 @@
       updateAiButtons(key);
       target.textContent = 'Albert ermittelt mögliche Käufergruppen …';
       try {
-        const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key}});
+        const {data,error} = await supabaseClient.functions.invoke('albert-target-audience',{body:{deal_id:key,force: audienceRegenerate.has(key)}});
         if(error) throw error;
         if(data?.status === 'pending') {
           showAiRetry(document.getElementById('target-audience-'+key), 'Zielgruppenanalyse wird noch verarbeitet.', () => loadTargetAudience(key));
@@ -2048,9 +2050,11 @@
         if (aiAction) {
           const id = String(aiAction.dataset.dealId);
           if (aiAction.dataset.aiType === 'portrait') {
+            if (portraitCache.has(id)) portraitRegenerate.add(id);
             portraitCache.delete(id);
             loadProductPortrait(id);
           } else {
+            if (audienceCache.has(id)) audienceRegenerate.add(id);
             audienceCache.delete(id);
             loadTargetAudience(id);
           }
