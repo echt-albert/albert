@@ -1283,7 +1283,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     function renderQuickMarket(id,data){
       const el=document.querySelector('[data-quick-market="'+id+'"]');if(!el)return;
       const eur=n=>Number(n).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
-      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">Keine Preisindikation gefunden · ungeprüft</span>';return;}
+      if(!data?.success||!(data.low_eur||data.cheapest_price_eur)){el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">'+(data?.error?'Preisabfrage fehlgeschlagen · erneut versuchen':data?.reason?'Keine Treffer: '+escapeHtml(data.reason):'Keine Preisindikation gefunden · ungeprüft')+'</span>';return;}
       const lo=data.low_eur||data.cheapest_price_eur,hi=data.high_eur;
       const range=hi&&hi>lo?eur(lo)+'–'+eur(hi):'ab '+eur(lo);
       const link=data.cheapest_url?'<a class="text-cyan-700 underline" target="_blank" rel="noopener noreferrer" href="'+escapeHtml(data.cheapest_url)+'">'+escapeHtml(data.cheapest_merchant||'Anbieter')+' ↗</a>':escapeHtml(data.cheapest_merchant||'');
@@ -1298,8 +1298,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if(el)el.innerHTML='<strong>🇩🇪 Deutscher B2C-Markt</strong><span class="ml-2 text-slate-500">KI-Preisindikation wird gesucht …</span>';
         quickMarketInFlight.add(id);
         fetch(SUPABASE_URL+'/functions/v1/albert-quick-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({product:{product_name:deal.product_name,brand:deal.brand,ean_gtin:deal.ean_gtin,mpn:deal.mpn}}),signal:AbortSignal.timeout(28000)})
-          .then(r=>r.json()).then(data=>{quickMarketCache.set(id,data);renderQuickMarket(id,data);})
-          .catch(()=>{const data={success:false};quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||"HTTP "+r.status);return data;}).then(data=>{if(data?.success&&(data.low_eur||data.cheapest_price_eur))quickMarketCache.set(id,data);renderQuickMarket(id,data);})
+          .catch(error=>{console.warn("Marktpreisabfrage fehlgeschlagen",id,error);renderQuickMarket(id,{success:false,error:String(error)});})
           .finally(()=>quickMarketInFlight.delete(id));
       }
     }
