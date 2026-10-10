@@ -1385,6 +1385,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       // Jeder Aufruf einer Rubrik beginnt mit geschlossenen Deal-Karten.
       dealExpansion.clear();
       activeDealView = nextView;
+      // Beim Wechsel in eine Deal-Rubrik den Quellenradar zuverlässig verlassen.
+      toggleSourceRadar(false);
       activeSpuersinnFilter = null;
       activeCategoryFilter = null;
       activeGradeFilter = null;
