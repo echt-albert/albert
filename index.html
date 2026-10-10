@@ -1958,33 +1958,71 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
     let ratingUserId = null;
     let learningDealIndex = [];
     const ratingBusy = new Set();
+    // Buyer-interest is distinct from economic grading. No influence on discovery.
+    const learningStopWords = new Set(['und','oder','mit','ohne','für','eine','einer','einem','das','der','die','den','dem','von','set','neu','original','stk','stück','ware','artikel','posten']);
     function learningTokens(deal) {
-      const parts = [deal.category,deal.brand,deal.supplier_name];
-      const url = String(deal.offer_url||'');
-      try {parts.push(new URL(url).hostname.replace(/^www\\./,''));}catch(e){}
-      const name = String(deal.product_name||'').toLocaleLowerCase('de-DE').split(/[^\\p{L}\\p{N}]+/u).filter(x=>x.length>3).slice(0,6);
-      const price=Number(deal.purchase_price), qty=Number(deal.quantity);
-      if(Number.isFinite(price)&&price>0)parts.push('preis:'+Math.floor(Math.log2(price)));
-      if(Number.isFinite(qty)&&qty>0)parts.push('menge:'+Math.floor(Math.log2(qty)));
-      return new Set([...parts,...name].filter(Boolean).map(x=>String(x).toLocaleLowerCase('de-DE')));
+      const tokens = new Set();
+      const add = (prefix,value) => {if(value!==null&&value!==undefined&&String(value).trim())tokens.add(prefix+String(value).trim().toLocaleLowerCase('de-DE'));};
+      add('category:',deal.category);
+      add('brand:',deal.brand);
+      add('supplier:',deal.supplier_name);
+      try {add('host:',new URL(deal.offer_url).hostname.replace(/^www\./,''));}catch(e){}
+      for(const word of String(deal.product_name||'').toLocaleLowerCase('de-DE').split(/[^\p{L}\p{N}]+/u)) {
+        if(word.length>3&&!learningStopWords.has(word))add('word:',word);
+      }
+      const price=Number(deal.purchase_price),qty=Number(deal.quantity);
+      if(Number.isFinite(price)&&price>0)add('price:',Math.floor(Math.log2(price)));
+      if(Number.isFinite(qty)&&qty>0)add('qty:',Math.floor(Math.log2(qty)));
+      return tokens;
+    }
+    let buyerLearningCache = null;
+    function invalidateBuyerLearning() {buyerLearningCache=null;}
+    function buyerLearningModel() {
+      if(buyerLearningCache)return buyerLearningCache;
+      const examples=learningDealIndex.filter(d=>userStarRatings.has(String(d.id))).map(d=>({
+        id:String(d.id),stars:userStarRatings.get(String(d.id)),tokens:learningTokens(d)
+      }));
+      const predict=(deal,excludeId)=>{
+        const tokens=learningTokens(deal),neighbors=[];
+        for(const ex of examples) {
+          if(ex.id===String(excludeId||deal.id))continue;
+          let score=0;
+          for(const token of tokens) {
+            if(!ex.tokens.has(token))continue;
+            if(token.startsWith('category:'))score+=3;
+            else if(token.startsWith('brand:'))score+=3;
+            else if(token.startsWith('word:'))score+=1;
+            else if(token.startsWith('supplier:')||token.startsWith('host:'))score+=0.7;
+            else score+=0.3;
+          }
+          if(score>=3)neighbors.push({stars:ex.stars,score});
+        }
+        neighbors.sort((a,b)=>b.score-a.score);
+        const best=neighbors.slice(0,10);
+        if(best.length<3)return null;
+        const sum=best.reduce((v,n)=>v+n.score,0);
+        return {stars:best.reduce((v,n)=>v+n.stars*n.score,0)/sum,count:best.length};
+      };
+      // Leave-one-out evaluation: only show predictions if they beat a naive mean.
+      let errors=0,baselineErrors=0,checked=0;
+      if(examples.length>=12)for(const ex of examples) {
+        const deal=learningDealIndex.find(d=>String(d.id)===ex.id);
+        if(!deal)continue;
+        const p=predict(deal,ex.id);
+        if(!p)continue;
+        const other=examples.filter(x=>x.id!==ex.id);
+        const mean=other.reduce((sum,x)=>sum+x.stars,0)/other.length;
+        errors+=Math.abs(p.stars-ex.stars);
+        baselineErrors+=Math.abs(mean-ex.stars);
+        checked++;
+      }
+      const validated=checked>=8 && errors<baselineErrors*0.95;
+      buyerLearningCache={predict,validated,checked,mae:checked?errors/checked:null,baselineMae:checked?baselineErrors/checked:null};
+      return buyerLearningCache;
     }
     function predictBuyerInterest(deal) {
-      const tokens=learningTokens(deal), neighbors=[];
-      for(const other of learningDealIndex) {
-        if(String(other.id)===String(deal.id))continue;
-        const stars=userStarRatings.get(String(other.id));
-        if(!stars)continue;
-        const otherTokens=learningTokens(other);
-        let overlap=0;for(const token of tokens)if(otherTokens.has(token))overlap++;
-        if(!overlap)continue;
-        const sharedReasons=(userRatingReasons.get(String(other.id))||[]).length;
-        neighbors.push({stars,weight:Math.min(overlap,4)+(sharedReasons?0.1:0)});
-      }
-      neighbors.sort((a,b)=>b.weight-a.weight);
-      const best=neighbors.slice(0,12);
-      if(best.length<3)return null;
-      const weight=best.reduce((sum,n)=>sum+n.weight,0);
-      return {stars:best.reduce((sum,n)=>sum+n.stars*n.weight,0)/weight, count:best.length};
+      const model=buyerLearningModel();
+      return model.validated?model.predict(deal):null;
     }
     function starWidget(id) {
       const score=userStarRatings.get(String(id))||0;
@@ -2036,8 +2074,8 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       if(!ratingUserId){showStatus('Bitte zuerst beim Einkäufer-Konto anmelden.',true);return;}
       if(star){
         const id=String(star.dataset.starId),old=userStarRatings.get(id);
-        userStarRatings.set(id,Number(star.dataset.starValue));refreshRatingWidget(id);
-        if(!await saveBuyerRating(id)){if(old)userStarRatings.set(id,old);else userStarRatings.delete(id);refreshRatingWidget(id);}
+        userStarRatings.set(id,Number(star.dataset.starValue));invalidateBuyerLearning();refreshRatingWidget(id);
+        if(!await saveBuyerRating(id)){if(old)userStarRatings.set(id,old);else userStarRatings.delete(id);invalidateBuyerLearning();refreshRatingWidget(id);}
       }else if(reason){
         const id=String(reason.dataset.ratingId),label=reason.dataset.ratingReason;
         const old=[...(userRatingReasons.get(id)||[])],next=new Set(old);
@@ -2211,6 +2249,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
           : '<button type="button" data-spuersinn-kind="'+escapeHtml(info.kind)+'" data-spuersinn-value="'+escapeHtml(info.value)+'" class="mt-2 block w-full rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-left text-xs text-slate-700 hover:border-cyan-300 hover:bg-cyan-100/70" title="Alle passenden Deals anzeigen">'+escapeHtml(info.note)+' <span class="font-semibold text-cyan-700">Alle ansehen ↗</span></button>';
       };
       learningDealIndex = deals || [];
+      invalidateBuyerLearning();
       const visibleDeals = activeGradeFilter ? categoryDeals.filter(deal => dealGrade(deal) === activeGradeFilter) : categoryDeals;
       const viewTitle = activeSpuersinnFilter ? 'Spürsinn · '+(activeSpuersinnFilter.kind === 'platform' ? 'Plattform' : 'Anbieter')+': '+activeSpuersinnFilter.value : dealViewNames[activeDealView];
       const viewHeading = '<div class="mb-4 flex items-center justify-between gap-3"><h2 class="text-sm font-semibold text-slate-800">' + escapeHtml(viewTitle) + '</h2><div class="flex items-center gap-3"><span class="font-mono text-xs text-slate-400">' + visibleDeals.length + ' Deals</span>' + (activeSpuersinnFilter ? '<button type="button" data-spuersinn-clear class="rounded-lg border border-cyan-200 px-2.5 py-1 text-xs text-cyan-800 hover:bg-cyan-50">Filter entfernen ×</button>' : '') + '</div></div>';
