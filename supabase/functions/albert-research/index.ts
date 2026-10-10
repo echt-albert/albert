@@ -58,7 +58,7 @@ async function buyerDiscoveryMemory(db: any): Promise<string> {
   for (const row of latest.values()) {
     if (!["LEARN", "REJECT", "WATCH", "DEEP_DIVE"].includes(row.action)) continue;
     actions.set(row.action, (actions.get(row.action) ?? 0) + 1);
-    const reason = row.comment.match(/^\\[Grund: ([^\\]]{1,80})\\]/)?.[1];
+    const reason = row.comment.startsWith("[Grund: ") ? row.comment.slice(8).split("]", 1)[0] : "";
     if (reason && allowed.has(reason)) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
   }
   if (!actions.size) return "";
