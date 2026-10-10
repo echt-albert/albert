@@ -129,7 +129,12 @@
         grid-template-columns: minmax(0, 1fr);
       }
     }
-  </style>
+  
+/* Produktporträt und Zielgruppen erhalten eine volle Zeile mit je halber Breite. */
+.deal-divisions > .deal-ai-wide-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.deal-ai-wide-grid > div { min-width: 0; }
+@media (max-width: 760px) { .deal-divisions > .deal-ai-wide-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
 </head>
 
 <body class="bg-[#f7f7f9] text-[#1d1d1f] min-h-screen selection:bg-amber-100 selection:text-amber-900 flex">
@@ -1930,6 +1935,8 @@
 
               </div>
 
+              <!-- BREITE KI-KACHELN: zwei Spalten statt schmalem Dreier-Grid -->
+              <div class="deal-ai-wide-grid">
               <!-- PRODUKTPORTRÄT -->
               <div class="bg-[#fafafc] p-4 rounded-xl border border-slate-100 flex flex-col">
                 <div class="flex items-center gap-2 mb-3">
@@ -1967,6 +1974,8 @@
                     <button type="submit" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">Fragen ↗</button>
                   </form>
                 </div>
+              </div>
+
               </div>
 
             </div>
