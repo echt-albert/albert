@@ -1390,7 +1390,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
       activeSpuersinnFilter = null;
       activeCategoryFilter = null;
       activeGradeFilter = null;
-      fetchDeals();
+      fetchDeals(true);
     });
 
     function plainProductDescription(deal) {
@@ -1949,17 +1949,27 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
         if (status) status.textContent = 'Serverwerte nicht geladen · lokale Eingaben bleiben erhalten.';
       }
     }
-    async function fetchDeals() {
+    // Rubrikwechsel rendern aus bereits geladenen Daten, ohne erneute Netzwerkanfragen.
+    let cachedDealSnapshot = null;
+    async function fetchDeals(useCached = false) {
 
       const container =
         document.getElementById('deals-container');
 
-      const { data: deals, error } = await supabaseClient
-        .from('discoveries')
-        .select('*')
-        .order('discovered_at', {
-          ascending: false
-        });
+      let deals, error, savedCategories, categoryError, feedbackRows, feedbackReadError;
+      if (useCached && cachedDealSnapshot) {
+        ({deals, savedCategories, feedbackRows} = cachedDealSnapshot);
+      } else {
+        const loaded = await Promise.all([
+          supabaseClient.from('discoveries').select('*').order('discovered_at', {ascending:false}),
+          supabaseClient.from('deal_category_labels').select('discovery_id,category'),
+          supabaseClient.from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id',{ascending:false})
+        ]);
+        ({data:deals,error} = loaded[0]);
+        ({data:savedCategories,error:categoryError} = loaded[1]);
+        ({data:feedbackRows,error:feedbackReadError} = loaded[2]);
+        if (!error && !feedbackReadError) cachedDealSnapshot = {deals,savedCategories,feedbackRows};
+      }
 
       if (error) {
 
@@ -1980,16 +1990,14 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
       radarDeals=deals||[];renderSourceRadar();
       window.albertDealsById = new Map((deals || []).map(deal => [String(deal.id), deal]));
-      const { data: savedCategories, error: categoryError } = await supabaseClient
-        .from('deal_category_labels').select('discovery_id,category');
+
       if (!categoryError) {
         categoryLabels = new Map((savedCategories || []).map(row => [String(row.discovery_id), row.category]));
         knownCategories = new Set((savedCategories || []).map(row => row.category));
       } else {
         console.warn('Kategorielabels konnten nicht geladen werden:', categoryError.message);
       }
-      const { data: feedbackRows, error: feedbackReadError } = await supabaseClient
-        .from('deal_feedback').select('discovery_id,action,id,comment,created_at').order('id', { ascending: false });
+
       if (feedbackReadError) {
         container.innerHTML = '<div class="p-5 text-rose-600 text-sm">Deal-Ablagen konnten nicht geladen werden: ' + escapeHtml(feedbackReadError.message) + '</div>';
         return;
