@@ -272,9 +272,9 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .deal-division-link{min-height:102px;padding:16px;border:1.5px solid #cbd5e1;border-radius:14px;background:#f8fafc;box-shadow:0 2px 5px rgba(15,23,42,.04);justify-content:center;gap:7px}
     .deal-workspace .deal-division-link strong{font-size:15px;color:#0f172a}
     .deal-workspace .deal-division-link small{font-size:11px;color:#64748b}
-    .deal-workspace .deal-division-link:hover{border-color:#3b82f6;background:#eff6ff}
-    .deal-workspace .deal-division-link[aria-current="true"]{border:2px solid #2563eb;background:#eff6ff;box-shadow:0 0 0 2px rgba(37,99,235,.10)}
-    .deal-workspace .deal-division-link[aria-current="true"] strong{color:#1d4ed8}
+    .deal-workspace .deal-division-link:hover{border-color:#2eb3ed;background:#eefaff}
+    .deal-workspace .deal-division-link[aria-current="true"]{border:2px solid #2eb3ed;background:#eefaff;box-shadow:0 0 0 2px rgba(46,179,237,.12)}
+    .deal-workspace .deal-division-link[aria-current="true"] strong{color:#138ac1}
     .deal-workspace .deal-divisions{display:block}
     .deal-workspace .deal-divisions>[data-division-section]{display:none!important}
     .deal-workspace .deal-divisions>[data-division-section].deal-workspace-active{display:flex!important}
@@ -2392,7 +2392,7 @@ out.querySelectorAll('[data-radar-action]').forEach(b=>b.addEventListener('click
 
         return `
 
-          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-blue-500 border-blue-500 '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+          <article id="deal-card-${dealId}" data-market-verified="${hasVerifiedMarket}" data-has-ean="${Boolean(deal.ean_gtin)}" class="${compact ? 'deal-compact ' : 'deal-workspace ring-2 ring-[#2eb3ed] border-[#2eb3ed] '}bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             <div class="mb-3 flex justify-end"><button type="button" data-close-dealakte="${dealId}" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">← Zur Deal-Karte</button></div>
             <!-- DEAL HEADER -->
 
