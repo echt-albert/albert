@@ -29,14 +29,16 @@ Deno.serve(async req=>{
  const title=clean(hit.title).toLowerCase();
  const normalize=(v:string)=>v.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g," ").trim();
  const stop=new Set(["fahrrad","werkzeug","werkzeugset","werkzeugkoffer","set","kit","reparaturset","multitool","teilige","teilig","teile","stück","mit","und","für","von","der","das","die","ein","eine"]);
- const words=normalize(name).split(" ").filter(w=>w.length>2&&!stop.has(w));
+ const tokens=normalize(name).split(" ").filter(w=>w.length>2&&!/^\d+$/.test(w));
+ const words=tokens.filter(w=>!stop.has(w));
+ const searchWords=words.length?words:tokens.filter(w=>!["set","kit","mit","und","der","die","das"].includes(w)).slice(0,3);
  const titleWords=normalize(title).split(" ");
- const matchesWords=words.filter(w=>titleWords.includes(w)).length;
+ const matchesWords=searchWords.filter(w=>titleWords.includes(w)).length;
  const requestedCount=name.match(/(\d+)\s*[- ]?\s*(?:teilig|teile|tlg)/i)?.[1];
  const foundCount=title.match(/(\d+)\s*[- ]?\s*(?:teilig|teile|tlg)/i)?.[1];
  const countCompatible=!requestedCount||!foundCount||requestedCount===foundCount;
  const brandCompatible=!brand||normalize(title).includes(normalize(brand));
- const match=countCompatible&&brandCompatible&&words.length>0&&matchesWords>=Math.max(1,Math.ceil(words.length*0.5));
+ const match=countCompatible&&brandCompatible&&searchWords.length>0&&matchesWords>=Math.max(1,Math.ceil(searchWords.length*0.5));
  if(!match)continue;
  const raw=String(hit.price||"").replace(/[^0-9,.]/g,"");const comma=raw.lastIndexOf(","),dot=raw.lastIndexOf(".");const normalized=comma>dot?raw.replaceAll(".","").replace(",","."):dot>comma?raw.replaceAll(",",""):raw.replace(",",".");const price=Number(normalized);
  let link=null;try{const u=new URL(hit.link||hit.productLink);if(u.protocol==="https:")link=u.href}catch{}
