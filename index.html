@@ -351,6 +351,16 @@ body.albert-account-open .albert-auth-panel{display:block!important}
     .deal-workspace .dealakte-top-actions .deal-header-spuersinn>[data-spuersinn-clear]{margin:0!important}
     @media(max-width:700px){.deal-workspace .dealakte-top-actions .deal-header-spuersinn{max-width:100%}}
 
+    /* Deal-Karte und Deal-Akte: identischer Titel-/Spürsinn-Anker beim Umschalten. */
+    article[data-scanner-import] { scroll-margin-top:12px; }
+    .deal-workspace .dealakte-top-row{align-items:flex-start!important}
+    .deal-workspace .dealakte-top-title{font-size:16px!important;line-height:24px!important;font-weight:600!important;letter-spacing:normal!important}
+    .deal-workspace .dealakte-top-actions{align-items:flex-start!important}
+    .deal-workspace .dealakte-top-actions .deal-header-spuersinn{align-items:flex-start!important}
+    .deal-workspace .dealakte-top-actions>button{margin-top:0!important}
+    .deal-workspace{padding-top:20px!important}
+    .deal-workspace .dealakte-top-row{margin-bottom:4px!important}
+
     /* Kompakte Deal-Karte: Dealakte auf Höhe der Sterne statt eigener Zeile */
     .deal-rating-with-akte{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
     .deal-rating-with-akte>[data-star-rating]{flex:1;min-width:0}
